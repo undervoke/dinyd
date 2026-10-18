@@ -2,7 +2,7 @@
 
 use std::ops::Range;
 
-use pulldown_cmark::{Event, Options, Parser};
+use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
@@ -50,8 +50,11 @@ pub struct Anchor {
 }
 
 impl Anchor {
-    pub fn is_malformed(&self) -> bool {
-        self.selector.is_none()
+    /// Selector text for output: one line, so a broken comment cannot carry prose along.
+    pub fn display_selector(&self) -> &str {
+        let text = &self.selector_text;
+        text.find(['\n', '\r'])
+            .map_or(text, |i| text[..i].trim_end())
     }
 }
 
@@ -87,12 +90,23 @@ fn scan_markdown(src: &str) -> Vec<Anchor> {
         | Options::ENABLE_TASKLISTS
         | Options::ENABLE_FOOTNOTES;
     let mut html: Vec<Range<usize>> = Vec::new();
+    // An inline comment without `-->` is not HTML to the parser; it stays in prose text.
+    let mut prose: Vec<Range<usize>> = Vec::new();
+    let mut in_code = false;
     for (event, range) in Parser::new_ext(src, options).into_offset_iter() {
-        if matches!(event, Event::Html(_) | Event::InlineHtml(_)) {
-            match html.last_mut() {
+        match event {
+            Event::Html(_) | Event::InlineHtml(_) => match html.last_mut() {
                 Some(last) if last.end >= range.start => last.end = last.end.max(range.end),
                 _ => html.push(range),
-            }
+            },
+            Event::Start(Tag::CodeBlock(_)) => in_code = true,
+            Event::End(TagEnd::CodeBlock) => in_code = false,
+            // The parser may split `<` from the rest of the text, so adjacent runs are merged.
+            Event::Text(_) if !in_code => match prose.last_mut() {
+                Some(last) if last.end == range.start => last.end = range.end,
+                _ => prose.push(range),
+            },
+            _ => {}
         }
     }
     let lines = LineIndex::new(src);
@@ -102,12 +116,7 @@ fn scan_markdown(src: &str) -> Vec<Anchor> {
         while let Some(open) = src[at..region.end].find("<!--") {
             let body_start = at + open + 4;
             let Some(close) = src[body_start..region.end].find("-->") else {
-                // An anchor whose terminator was lost still counts, as malformed.
-                let body = body_start..region.end;
-                if let Some(mut anchor) = parse_body(src, body, lines.line(at + open)) {
-                    anchor.selector = None;
-                    anchors.push(anchor);
-                }
+                anchors.extend(unterminated(src, body_start, region.end, &lines));
                 break;
             };
             let body_end = body_start + close;
@@ -117,7 +126,27 @@ fn scan_markdown(src: &str) -> Vec<Anchor> {
             at = body_end + 3;
         }
     }
+    for region in prose {
+        let mut at = region.start;
+        while let Some(open) = src[at..region.end].find("<!--") {
+            let body_start = at + open + 4;
+            anchors.extend(unterminated(src, body_start, region.end, &lines));
+            at = body_start;
+        }
+    }
+    anchors.sort_by_key(|a| a.selector_span.start);
     anchors
+}
+
+/// An anchor whose `-->` was lost still counts, as malformed. Its body is bounded to its own
+/// line so that following prose never becomes selector text.
+fn unterminated(src: &str, body_start: usize, end: usize, lines: &LineIndex) -> Option<Anchor> {
+    let line_end = src[body_start..end]
+        .find(['\n', '\r'])
+        .map_or(end, |i| body_start + i);
+    let mut anchor = parse_body(src, body_start..line_end, lines.line(body_start))?;
+    anchor.selector = None;
+    Some(anchor)
 }
 
 /// Anchors in own-line `%%` comments; leading frontmatter is skipped.
@@ -244,7 +273,8 @@ pub fn parse_selector(text: &str) -> Option<Selector> {
         && path
             .split('/')
             .all(|segment| segment != "." && segment != "..");
-    if !path_ok || location.is_some_and(|l| l.trim().is_empty()) {
+    let location_ok = location.is_none_or(|l| !l.trim().is_empty() && !l.contains(['\n', '\r']));
+    if !path_ok || !location_ok {
         return None;
     }
     Some(Selector {

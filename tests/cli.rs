@@ -834,3 +834,25 @@ fn s1_treats_code_inside_template_strings_as_code() {
         );
     }
 }
+
+#[test]
+fn unterminated_anchors_stay_on_their_own_line() {
+    let repo = Repo::new();
+    repo.write("a.ts", "export function f() {}\n");
+    repo.write("inline.md", "Claim. <!-- dinyd: a.ts s1:0123456789abcdef");
+    repo.write(
+        "block.md",
+        "<!-- dinyd: a.ts#f s1:fedcba9876543210\nThis claim must stay in the document.\n",
+    );
+    repo.git(&["add", "-A"]);
+    let run = repo.check(&[]);
+    assert_eq!(
+        run.lines(),
+        [
+            format!("block.md → a.ts#f: {MALFORMED}"),
+            format!("inline.md → a.ts: {MALFORMED}"),
+        ]
+    );
+    assert!(!run.stdout.contains("0123456789abcdef") && !run.stdout.contains("fedcba9876543210"));
+    assert!(!run.stdout.contains("Claim") && !run.stdout.contains("must stay"));
+}
