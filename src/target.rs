@@ -177,34 +177,46 @@ fn region(node: Node, source: &[u8], offset: usize) -> Region {
     }
 }
 
-/// Structural token stream: node kinds, leaf text, and any non-whitespace text between children.
-/// Whitespace between tokens never reaches the stream; comments are ordinary nodes and do.
+/// Structural token stream: tokens plus nesting markers per named node, without node kinds.
+/// Whitespace between tokens never reaches the stream. Strings, scalars, and comments are one
+/// token each with their content verbatim, since some grammars (YAML) leave it outside any leaf.
 fn serialize(node: Node, source: &[u8], out: &mut Vec<u8>) {
-    let field = |out: &mut Vec<u8>, tag: u8, bytes: &[u8]| {
-        out.push(tag);
-        out.extend((bytes.len() as u32).to_le_bytes());
-        out.extend(bytes);
-    };
-    if node.child_count() == 0 {
-        field(out, b'T', node.kind().as_bytes());
-        field(out, b'=', &source[node.byte_range()]);
+    let payload = node.is_named()
+        && ["string", "scalar", "comment"]
+            .iter()
+            .any(|k| node.kind().contains(k));
+    if node.child_count() == 0 || payload {
+        token(out, &source[node.byte_range()]);
         return;
     }
-    field(out, b'(', node.kind().as_bytes());
+    if node.is_named() {
+        out.push(b'(');
+    }
     let mut at = node.start_byte();
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        gap(&source[at..child.start_byte().max(at)], out, &field);
+        gap(&source[at..child.start_byte().max(at)], out);
         serialize(child, source, out);
         at = child.end_byte();
     }
-    gap(&source[at..node.end_byte().max(at)], out, &field);
-    out.push(b')');
+    gap(&source[at..node.end_byte().max(at)], out);
+    if node.is_named() {
+        out.push(b')');
+    }
 }
 
-fn gap(text: &[u8], out: &mut Vec<u8>, field: &impl Fn(&mut Vec<u8>, u8, &[u8])) {
-    if text.iter().any(|b| !b.is_ascii_whitespace()) {
-        field(out, b'"', text);
+fn token(out: &mut Vec<u8>, bytes: &[u8]) {
+    out.push(b'T');
+    out.extend((bytes.len() as u32).to_le_bytes());
+    out.extend(bytes);
+}
+
+/// Text a grammar leaves between children; only whitespace there is formatting.
+fn gap(text: &[u8], out: &mut Vec<u8>) {
+    let start = text.iter().position(|b| !b.is_ascii_whitespace());
+    let end = text.iter().rposition(|b| !b.is_ascii_whitespace());
+    if let (Some(start), Some(end)) = (start, end) {
+        token(out, &text[start..=end]);
     }
 }
 
@@ -424,8 +436,16 @@ fn collect_script<'t>(
         .child_by_field_name("name")
         .map(|n| text(n, source).to_string());
     match node.kind() {
-        "export_statement" | "ambient_declaration" | "expression_statement" => {
-            collect(node, source, Lang::Script, prefix, out)
+        "expression_statement" => collect(node, source, Lang::Script, prefix, out),
+        // The wrapper is part of the declaration's evidence: removing `export` changes the digest.
+        "export_statement" | "ambient_declaration" => {
+            let first = out.len();
+            collect(node, source, Lang::Script, prefix, out);
+            for symbol in &mut out[first..] {
+                if symbol.node.parent() == Some(node) {
+                    symbol.node = node;
+                }
+            }
         }
         "class_declaration"
         | "abstract_class_declaration"
@@ -831,20 +851,36 @@ fn yaml_scalar(node: Node, source: &[u8]) -> Option<String> {
 
 // ---- CSS rules ----
 
-/// Selector text with whitespace collapsed and dropped around combinators and commas.
+/// Selector text with whitespace collapsed and dropped around combinators and commas,
+/// outside strings and escapes, which are exact data.
 fn normalize_css(selector: &str) -> String {
-    let collapsed = selector.split_whitespace().collect::<Vec<_>>().join(" ");
     let mut out = String::new();
-    for c in collapsed.chars() {
-        if matches!(c, ',' | '>' | '+' | '~') {
-            while out.ends_with(' ') {
-                out.pop();
-            }
-            out.push(c);
-        } else if c == ' ' && out.ends_with([',', '>', '+', '~']) {
+    let mut chars = selector.trim().chars();
+    let mut space = false;
+    while let Some(c) = chars.next() {
+        if c.is_whitespace() {
+            space = true;
             continue;
-        } else {
-            out.push(c);
+        }
+        let combinator = matches!(c, ',' | '>' | '+' | '~');
+        if space && !combinator && !out.ends_with([',', '>', '+', '~']) {
+            out.push(' ');
+        }
+        space = false;
+        out.push(c);
+        match c {
+            '\\' => out.extend(chars.next()),
+            '"' | '\'' => {
+                while let Some(d) = chars.next() {
+                    out.push(d);
+                    if d == '\\' {
+                        out.extend(chars.next());
+                    } else if d == c {
+                        break;
+                    }
+                }
+            }
+            _ => {}
         }
     }
     out

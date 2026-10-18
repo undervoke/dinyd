@@ -658,3 +658,73 @@ fn unmerged_and_intent_to_add_targets_are_unresolved_in_the_index() {
     );
     assert_eq!(repo.check(&["--worktree"]).lines(), [stale]);
 }
+
+#[test]
+fn s1_keeps_whitespace_inside_strings_and_scalars() {
+    let repo = Repo::new();
+    let yaml = "sep: \" \"\nother: 1\n";
+    let script = "export const label = \"a b\";\n";
+    repo.write("cfg.yaml", yaml);
+    repo.write("l.ts", script);
+    repo.write("doc.md", "Separator.\n\nWhole file.\n\nLabel.\n");
+    repo.git(&["add", "-A"]);
+    repo.apply("doc.md", 1, "cfg.yaml#/sep", &[]);
+    repo.apply("doc.md", 3, "cfg.yaml", &[]);
+    repo.apply("doc.md", 5, "l.ts#label", &[]);
+    repo.git(&["add", "-A"]);
+    assert_eq!(repo.check(&[]).code, 0);
+
+    repo.write("cfg.yaml", &yaml.replace("\" \"", "\"  \""));
+    repo.write("l.ts", &script.replace("a b", "a  b"));
+    assert_eq!(
+        repo.check(&["--worktree"]).lines(),
+        [
+            format!("doc.md → cfg.yaml#/sep: {STALE}"),
+            format!("doc.md → cfg.yaml: {STALE}"),
+            format!("doc.md → l.ts#label: {STALE}"),
+        ]
+    );
+}
+
+#[test]
+fn removing_export_changes_the_declaration_digest() {
+    let repo = Repo::new();
+    let source = "export function f() { return 1; }\nexport const k = 2;\n";
+    repo.write("m.ts", source);
+    repo.write("doc.md", "f is exported.\n\nk is exported.\n");
+    repo.git(&["add", "-A"]);
+    repo.apply("doc.md", 1, "m.ts#f", &[]);
+    repo.apply("doc.md", 3, "m.ts#k", &[]);
+    repo.git(&["add", "-A"]);
+    assert_eq!(repo.check(&[]).code, 0);
+
+    repo.write("m.ts", &source.replace("export ", ""));
+    assert_eq!(
+        repo.check(&["--worktree"]).lines(),
+        [
+            format!("doc.md → m.ts#f: {STALE}"),
+            format!("doc.md → m.ts#k: {STALE}")
+        ]
+    );
+}
+
+#[test]
+fn css_strings_are_exact_in_rule_selectors() {
+    let repo = Repo::new();
+    let css = "[aria-label=\"Save, close\"] > .icon { color: red; }\n";
+    repo.write("site.css", css);
+    repo.write(
+        "doc.md",
+        "Save button <!-- dinyd-ref: site.css#[aria-label=\"Save, close\"]>.icon -->\n",
+    );
+    repo.git(&["add", "-A"]);
+    assert_eq!(repo.check(&[]).code, 0, "{}", repo.check(&[]).stderr);
+
+    repo.write("site.css", &css.replace("Save, close", "Save,close"));
+    assert_eq!(
+        repo.check(&["--worktree"]).lines(),
+        [format!(
+            "doc.md → site.css#[aria-label=\"Save, close\"]>.icon: {UNRESOLVED}"
+        )]
+    );
+}
