@@ -2,7 +2,7 @@
 
 use std::ops::Range;
 
-use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd};
+use pulldown_cmark::{Event, Options, Parser, Tag};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
@@ -96,72 +96,65 @@ pub fn scan(kind: DocKind, src: &str) -> Vec<Anchor> {
     }
 }
 
-/// Anchors in HTML comments; fenced and indented code yield no HTML events, so they are skipped.
+/// Anchors in HTML comments anywhere outside code. The parser supplies only the code to skip
+/// (fenced and indented blocks, inline code spans): it drops some comments from its events,
+/// such as one after a table row's last pipe, and an unterminated comment is not HTML to it.
 fn scan_markdown(src: &str) -> Vec<Anchor> {
     let options = Options::ENABLE_TABLES
         | Options::ENABLE_STRIKETHROUGH
         | Options::ENABLE_TASKLISTS
         | Options::ENABLE_FOOTNOTES;
-    let mut html: Vec<Range<usize>> = Vec::new();
-    // An inline comment without `-->` is not HTML to the parser; it stays in prose text.
-    let mut prose: Vec<Range<usize>> = Vec::new();
-    let mut in_code = false;
-    for (event, range) in Parser::new_ext(src, options).into_offset_iter() {
-        match event {
-            Event::Html(_) | Event::InlineHtml(_) => match html.last_mut() {
-                Some(last) if last.end >= range.start => last.end = last.end.max(range.end),
-                _ => html.push(range),
-            },
-            Event::Start(Tag::CodeBlock(_)) => in_code = true,
-            Event::End(TagEnd::CodeBlock) => in_code = false,
-            // The parser may split `<` from the rest of the text, so adjacent runs are merged.
-            Event::Text(_) if !in_code => match prose.last_mut() {
-                Some(last) if last.end == range.start => last.end = range.end,
-                _ => prose.push(range),
-            },
-            _ => {}
-        }
-    }
+    let mut code: Vec<Range<usize>> = Parser::new_ext(src, options)
+        .into_offset_iter()
+        .filter(|(event, _)| matches!(event, Event::Start(Tag::CodeBlock(_)) | Event::Code(_)))
+        .map(|(_, range)| range)
+        .collect();
+    code.sort_by_key(|r| r.start);
+    let in_code = |offset: usize| {
+        let i = code.partition_point(|r| r.end <= offset);
+        code.get(i).filter(|r| r.start <= offset).map(|r| r.end)
+    };
+
     let lines = LineIndex::new(src);
     let mut anchors = Vec::new();
-    for region in html {
-        let mut at = region.start;
-        while let Some(open) = src[at..region.end].find("<!--") {
-            let body_start = at + open + 4;
-            let Some(close) = src[body_start..region.end].find("-->") else {
-                anchors.extend(unterminated(src, body_start, region.end, &lines));
-                break;
-            };
-            let body_end = body_start + close;
-            // `<!--` cannot occur inside a comment: the earlier one lost its terminator.
-            if let Some(nested) = src[body_start..body_end].find("<!--") {
-                anchors.extend(unterminated(src, body_start, body_start + nested, &lines));
-                at = body_start + nested;
-                continue;
-            }
-            if let Some(anchor) = parse_body(src, body_start..body_end, lines.line(at + open)) {
-                anchors.push(anchor);
-            }
-            at = body_end + 3;
+    let mut at = 0;
+    while let Some(found) = src[at..].find("<!--") {
+        let open = at + found;
+        if let Some(code_end) = in_code(open) {
+            at = code_end;
+            continue;
         }
-    }
-    for region in prose {
-        let mut at = region.start;
-        while let Some(open) = src[at..region.end].find("<!--") {
-            let body_start = at + open + 4;
-            // An odd run of backslashes escapes `<`: a literal example, not a comment.
-            let escapes = src[..at + open]
-                .bytes()
-                .rev()
-                .take_while(|&b| b == b'\\')
-                .count();
-            if escapes % 2 == 0 {
-                anchors.extend(unterminated(src, body_start, region.end, &lines));
-            }
+        let body_start = open + 4;
+        // An odd run of backslashes escapes `<`: a literal example, not a comment.
+        let escapes = src[..open]
+            .bytes()
+            .rev()
+            .take_while(|&b| b == b'\\')
+            .count();
+        if escapes % 2 == 1 {
             at = body_start;
+            continue;
+        }
+        let close = src[body_start..].find("-->").map(|i| body_start + i);
+        // `<!--` cannot occur inside a comment: an earlier one means this one lost its terminator.
+        let nested = src[body_start..close.unwrap_or(src.len())]
+            .find("<!--")
+            .map(|i| body_start + i);
+        match (close, nested) {
+            (Some(body_end), None) => {
+                anchors.extend(parse_body(src, body_start..body_end, lines.line(open)));
+                at = body_end + 3;
+            }
+            (_, Some(next)) => {
+                anchors.extend(unterminated(src, body_start, next, &lines));
+                at = next;
+            }
+            (None, None) => {
+                anchors.extend(unterminated(src, body_start, src.len(), &lines));
+                break;
+            }
         }
     }
-    anchors.sort_by_key(|a| a.selector_span.start);
     anchors
 }
 

@@ -387,12 +387,28 @@ fn container<'t>(
     prefix: &mut Vec<String>,
     out: &mut Vec<Symbol<'t>>,
 ) {
-    push(out, prefix, name, node);
+    container_path(node, &[name], source, lang, prefix, out);
+}
+
+/// `container` for a name of several segments, such as `namespace Foo.Bar`.
+fn container_path<'t>(
+    node: Node<'t>,
+    segments: &[&str],
+    source: &[u8],
+    lang: Lang,
+    prefix: &mut Vec<String>,
+    out: &mut Vec<Symbol<'t>>,
+) {
+    let depth = prefix.len();
+    prefix.extend(segments.iter().map(|s| s.to_string()));
+    out.push(Symbol {
+        path: prefix.clone(),
+        node,
+    });
     if let Some(body) = node.child_by_field_name("body") {
-        prefix.push(name.to_string());
         collect(body, source, lang, prefix, out);
-        prefix.pop();
     }
+    prefix.truncate(depth);
 }
 
 fn collect_csharp<'t>(
@@ -431,6 +447,8 @@ fn collect_csharp<'t>(
                 push(out, prefix, &name, node);
             }
         }
+        // Declarations under `#if` and similar directives belong to the enclosing scope.
+        kind if kind.starts_with("preproc_") => collect(node, source, Lang::CSharp, prefix, out),
         "field_declaration" | "event_field_declaration" => {
             for declaration in named_children(node)
                 .into_iter()
@@ -471,14 +489,45 @@ fn collect_script<'t>(
                 }
             }
         }
-        "class_declaration"
-        | "abstract_class_declaration"
-        | "interface_declaration"
-        | "internal_module"
-        | "enum_declaration" => {
+        "class_declaration" | "abstract_class_declaration" | "interface_declaration" => {
             if let Some(name) = name {
                 container(node, &name, source, Lang::Script, prefix, out);
             }
+        }
+        // `namespace Foo.Bar`, `module M`, `declare module "fs"`: the name's segments nest.
+        "internal_module" | "module" => {
+            if let Some(name) = node.child_by_field_name("name") {
+                let raw = text(name, source);
+                let segments: Vec<&str> = if name.kind() == "string" {
+                    vec![raw.trim_matches(['"', '\''])]
+                } else {
+                    raw.split('.').map(str::trim).collect()
+                };
+                container_path(node, &segments, source, Lang::Script, prefix, out);
+            }
+        }
+        "enum_declaration" => {
+            let (Some(name), Some(body)) = (name, node.child_by_field_name("body")) else {
+                return;
+            };
+            push(out, prefix, &name, node);
+            prefix.push(name);
+            for member in named_children(body) {
+                let name = match member.kind() {
+                    "property_identifier" | "string" => Some(member),
+                    "enum_assignment" => member.child_by_field_name("name"),
+                    _ => None,
+                };
+                if let Some(name) = name {
+                    push(
+                        out,
+                        prefix,
+                        text(name, source).trim_matches(['"', '\'']),
+                        member,
+                    );
+                }
+            }
+            prefix.pop();
         }
         "function_declaration"
         | "generator_function_declaration"
@@ -514,23 +563,6 @@ fn collect_script<'t>(
                         prefix,
                         text(name, source),
                         if single { node } else { declarator },
-                    );
-                }
-            }
-        }
-        "enum_body" => {
-            for member in named_children(node) {
-                let name = match member.kind() {
-                    "property_identifier" | "string" => Some(member),
-                    "enum_assignment" => member.child_by_field_name("name"),
-                    _ => None,
-                };
-                if let Some(name) = name {
-                    push(
-                        out,
-                        prefix,
-                        text(name, source).trim_matches(['"', '\'']),
-                        member,
                     );
                 }
             }

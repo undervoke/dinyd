@@ -190,7 +190,7 @@ impl<'r> Snapshot<'r> {
             .filter(|(path, entry)| match self.basis {
                 // Unmerged documents are read from disk too: their anchors are there.
                 Basis::Worktree => {
-                    !matches!(entry, Entry::Gitlink | Entry::Symlink)
+                    !matches!(entry, Entry::Gitlink)
                         && std::fs::symlink_metadata(self.repo.disk_path(path))
                             .is_ok_and(|m| m.is_file())
                 }
@@ -205,7 +205,7 @@ impl<'r> Snapshot<'r> {
             Basis::Worktree => {
                 if matches!(
                     self.entries.get(path),
-                    Some(Entry::Unmerged | Entry::Gitlink | Entry::Symlink)
+                    Some(Entry::Unmerged | Entry::Gitlink)
                 ) {
                     return Lookup::Rejected;
                 }

@@ -886,3 +886,83 @@ fn a_lost_terminator_before_another_anchor_and_escaped_examples() {
     );
     assert!(!run.stdout.contains("0123456789abcdef") && !run.stdout.contains("Claim"));
 }
+
+#[test]
+fn nested_and_conditional_declarations_are_symbols() {
+    let repo = Repo::new();
+    repo.write(
+        "m.ts",
+        "export enum E { A = 1, B = 2 }\nnamespace Foo.Bar { export class Thing { run(): number { return 1; } } }\nmodule M { export function b() { return 1; } }\ndeclare module \"fs\" { export function readFile(path: string): void; }\n",
+    );
+    repo.write(
+        "a.cs",
+        "#if DEBUG\nclass A { void F() { } }\n#endif\nclass B { void G() { } }\n",
+    );
+    let selectors = [
+        "m.ts#E.A",
+        "m.ts#Foo.Bar.Thing.run",
+        "m.ts#M.b",
+        "m.ts#fs.readFile",
+        "a.cs#A.F",
+    ];
+    repo.write("doc.md", &"claim\n".repeat(selectors.len()));
+    repo.git(&["add", "-A"]);
+    for (i, selector) in selectors.iter().enumerate() {
+        repo.apply("doc.md", i + 1, selector, &[]);
+    }
+    repo.git(&["add", "-A"]);
+    assert_eq!(repo.check(&[]).code, 0);
+}
+
+#[test]
+fn worktree_judges_the_file_type_on_disk() {
+    let repo = Repo::new();
+    // The index records link.cs and notes.md as symlinks; on disk they are now regular files.
+    let blob = |content: &str| {
+        repo.write("blob.tmp", content);
+        let oid = repo
+            .git(&["hash-object", "-w", "blob.tmp"])
+            .trim()
+            .to_string();
+        std::fs::remove_file(repo.path().join("blob.tmp")).unwrap();
+        oid
+    };
+    let link = blob("real.cs");
+    for path in ["link.cs", "notes.md"] {
+        repo.git(&[
+            "update-index",
+            "--add",
+            "--cacheinfo",
+            &format!("120000,{link},{path}"),
+        ]);
+    }
+    repo.write("link.cs", CLASS);
+    repo.write("notes.md", "Gone <!-- dinyd-ref: missing.cs -->\n");
+    repo.write("doc.md", "F claim.\n");
+    repo.git(&["add", "doc.md"]);
+    repo.apply("doc.md", 1, "link.cs#A.F", &["--worktree"]);
+    assert_eq!(
+        repo.check(&["--worktree"]).lines(),
+        [format!("notes.md → missing.cs: {UNRESOLVED}")]
+    );
+}
+
+#[test]
+fn an_anchor_after_a_table_row_is_read() {
+    let repo = Repo::new();
+    repo.write("a.cs", CLASS);
+    repo.write("doc.md", "| a | b |\n| --- | --- |\n| F | does nothing |\n");
+    repo.git(&["add", "-A"]);
+    repo.apply("doc.md", 3, "a.cs#A.F", &[]);
+    repo.git(&["add", "-A"]);
+    assert_eq!(repo.check(&[]).code, 0);
+    repo.write(
+        "a.cs",
+        &CLASS.replace("void F() { }", "void F() { return; }"),
+    );
+    repo.git(&["add", "-A"]);
+    assert_eq!(
+        repo.check(&[]).lines(),
+        [format!("doc.md → a.cs#A.F: {STALE}")]
+    );
+}
