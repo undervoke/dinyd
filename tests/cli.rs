@@ -892,7 +892,7 @@ fn nested_and_conditional_declarations_are_symbols() {
     let repo = Repo::new();
     repo.write(
         "m.ts",
-        "export enum E { A = 1, B = 2 }\nnamespace Foo.Bar { export class Thing { run(): number { return 1; } } }\nmodule M { export function b() { return 1; } }\ndeclare module \"fs\" { export function readFile(path: string): void; }\n",
+        "export enum E { A = 1, B = 2 }\nnamespace Foo.Bar { export class Thing { run(): number { return 1; } } }\nmodule M { export function b() { return 1; } }\ndeclare module \"fs\" { export function readFile(path: string): void; }\ndeclare module \"decimal.js\" { export function config(): void; }\n",
     );
     repo.write(
         "a.cs",
@@ -903,6 +903,7 @@ fn nested_and_conditional_declarations_are_symbols() {
         "m.ts#Foo.Bar.Thing.run",
         "m.ts#M.b",
         "m.ts#fs.readFile",
+        "m.ts#decimal.js.config",
         "a.cs#A.F",
     ];
     repo.write("doc.md", &"claim\n".repeat(selectors.len()));

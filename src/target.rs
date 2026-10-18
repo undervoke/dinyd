@@ -317,6 +317,14 @@ struct Symbol<'t> {
     node: Node<'t>,
 }
 
+impl Symbol<'_> {
+    /// The selector names the dotted path; a segment may itself contain dots, such as the
+    /// module name in `declare module "decimal.js"`.
+    fn matches(&self, name: &str) -> bool {
+        self.path.join(".") == name
+    }
+}
+
 fn pick_symbols(
     location: &str,
     symbols: Vec<Symbol>,
@@ -327,8 +335,7 @@ fn pick_symbols(
         Some(name) => (name, true),
         None => (location, false),
     };
-    let wanted: Vec<&str> = name.split('.').collect();
-    let mut matches: Vec<&Symbol> = symbols.iter().filter(|s| s.path == wanted).collect();
+    let mut matches: Vec<&Symbol> = symbols.iter().filter(|s| s.matches(name)).collect();
     matches.sort_by_key(|s| s.node.start_byte());
     match matches.len() {
         0 => unresolved("symbol not found"),
@@ -723,9 +730,8 @@ fn vue_regions(source: &[u8], location: &str) -> Result<Vec<Region>, Failure> {
         Some(name) => (name, true),
         None => (location, false),
     };
-    let wanted: Vec<&str> = name.split('.').collect();
     let mut matches: Vec<&(Symbol, usize)> =
-        found.iter().filter(|(s, _)| s.path == wanted).collect();
+        found.iter().filter(|(s, _)| s.matches(name)).collect();
     matches.sort_by_key(|(s, start)| start + s.node.start_byte());
     if matches.len() > 1 && !grouped {
         return unresolved("same-named members are ambiguous; name(*) groups them");
