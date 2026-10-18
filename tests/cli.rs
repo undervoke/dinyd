@@ -46,7 +46,17 @@ impl Repo {
     }
 
     fn git(&self, args: &[&str]) -> String {
-        let output = Command::new("git")
+        let output = self.git_output(args);
+        assert!(
+            output.status.success(),
+            "git {args:?}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8(output.stdout).unwrap()
+    }
+
+    fn git_output(&self, args: &[&str]) -> std::process::Output {
+        Command::new("git")
             .args([
                 "-c",
                 "user.name=t",
@@ -58,13 +68,7 @@ impl Repo {
             .args(args)
             .current_dir(self.path())
             .output()
-            .unwrap();
-        assert!(
-            output.status.success(),
-            "git {args:?}: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-        String::from_utf8(output.stdout).unwrap()
+            .unwrap()
     }
 
     fn commit(&self, message: &str) {
@@ -631,12 +635,11 @@ fn unmerged_and_intent_to_add_targets_are_unresolved_in_the_index() {
     repo.git(&["checkout", "-q", &main]);
     repo.write("src/a.cs", &CLASS.replace("F()", "Main()"));
     repo.commit("main");
-    let merge = Command::new("git")
-        .args(["merge", "-q", "side"])
-        .current_dir(repo.path())
-        .output()
-        .unwrap();
-    assert!(!merge.status.success(), "the merge conflicts");
+    repo.git_output(&["merge", "-q", "side"]);
+    assert!(
+        !repo.git(&["ls-files", "-u"]).is_empty(),
+        "the merge conflicts"
+    );
 
     let expected = [format!("doc.md → src/a.cs: {UNRESOLVED}")];
     assert_eq!(repo.check(&["--index"]).lines(), expected);
