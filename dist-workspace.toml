@@ -15,3 +15,7 @@ targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "aarch64-unknown-linux
 hosting = "github"
 # Release runs only on tag pushes; CI covers build and test
 pr-run-mode = "skip"
+
+# dist 0.32.0 defaults arm64 macOS to macos-14, which GitHub retires (actions/runner-images#13518)
+[dist.github-custom-runners]
+aarch64-apple-darwin = "macos-15"

@@ -33,8 +33,9 @@ shasum -a 256 -c "dinyd-$t.tar.xz.sha256"
 tar -xJf "dinyd-$t.tar.xz"   # binary at dinyd-$t/dinyd
 ```
 
-With a Rust toolchain, `cargo install --locked --git https://github.com/undervoke/dinyd --tag v0.1.0`
-builds the same version from source.
+With Rust 1.93.0 or later and a C build toolchain,
+`cargo install --locked --git https://github.com/undervoke/dinyd --tag v0.1.0`
+builds the same version from source. The prebuilt archives need neither.
 
 dinyd runs `git` at run time and must be run inside a Git working tree.
 
@@ -103,7 +104,7 @@ docs/auth.md → src/Hasher.cs#PasswordHasher.Verify: stale — re-judge the cla
 |---|---|---|
 | `stale` | The target changed since the digest | Re-judge the claim, then `update` |
 | `undeclared` | A hand-written digest anchor without a digest | `update` fills it |
-| `unresolved` | The target is missing, ambiguous, or unreadable | Re-judge the claim and the reference |
+| `unresolved` | The target is missing, ambiguous, of a disallowed kind (such as a symlink), or cannot be parsed | Re-judge the claim and the reference |
 | `malformed` | The anchor itself is broken | Re-judge the claim and the reference |
 
 Output never carries line numbers, digests, or document text; the reason a
@@ -127,8 +128,8 @@ Writes one anchor with its mode and first digest: at the end of line `n` in
 Markdown, on a new `%%` line after line `n` in `.mermaid`. It prints the
 anchor and names the view the target was read from. It refuses, writing
 nothing, when the target does not resolve, the same anchor is already there,
-or the anchor would land where check cannot read it (inside code, a comment,
-or frontmatter).
+or check's parser would not read the written anchor, as inside a code block
+or `.mermaid` frontmatter.
 
 ### update
 
