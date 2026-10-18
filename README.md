@@ -66,7 +66,7 @@ as the only separator. Without `#location` the selector is the whole file.
 | Target | Location |
 |---|---|
 | C#, TypeScript, JavaScript, Go | Symbol path: `Class.Method`, `Namespace.Type.Field`, `Type.Method` (Go), `Enum.Member` |
-| Vue | Symbol path inside the top-level `<script>` |
+| Vue | Symbol path inside a top-level `<script>` or `<script setup>` |
 | JSON, YAML | JSON Pointer: `/scripts/build`, `/jobs/test/steps/0` |
 | CSS | A rule's selector: `.card > .title` |
 
