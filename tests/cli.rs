@@ -808,3 +808,29 @@ fn b1_hashes_exactly_the_selected_bytes_and_apply_names_its_basis() {
     assert_eq!(run.stdout.trim(), "dinyd: cfg.json#/a b1:6b86b273ff34fce1");
     assert!(run.stderr.contains("--index"), "{}", run.stderr);
 }
+
+#[test]
+fn s1_treats_code_inside_template_strings_as_code() {
+    let repo = Repo::new();
+    let source = "function f(a) { return `n=${a+1}`; }\n";
+    repo.write("f.js", source);
+    repo.write("doc.md", "f formats n.\n");
+    repo.git(&["add", "-A"]);
+    repo.apply("doc.md", 1, "f.js#f", &[]);
+    repo.git(&["add", "-A"]);
+
+    repo.write("f.js", &source.replace("a+1", "a + 1"));
+    assert_eq!(
+        repo.check(&["--worktree"]).code,
+        0,
+        "spacing inside ${{}} is formatting"
+    );
+    for changed in [source.replace("n=", "n= "), source.replace("a+1", "a+2")] {
+        repo.write("f.js", &changed);
+        assert_eq!(
+            repo.check(&["--worktree"]).lines(),
+            [format!("doc.md → f.js#f: {STALE}")],
+            "{changed}"
+        );
+    }
+}

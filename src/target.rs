@@ -177,15 +177,19 @@ fn region(node: Node, source: &[u8], offset: usize) -> Region {
 }
 
 /// Structural token stream: tokens plus nesting markers per named node, without node kinds.
-/// Whitespace between tokens never reaches the stream. Strings, scalars, and comments are one
-/// token each with their content verbatim, since some grammars (YAML) leave it outside any leaf.
+/// Whitespace between tokens never reaches the stream. Strings, scalars, and comments keep
+/// their literal content verbatim, since some grammars (YAML) leave it outside any leaf.
 fn serialize(node: Node, source: &[u8], out: &mut Vec<u8>) {
     let payload = node.is_named()
         && ["string", "scalar", "comment"]
             .iter()
             .any(|k| node.kind().contains(k));
-    if node.child_count() == 0 || payload {
+    if node.child_count() == 0 {
         token(out, &source[node.byte_range()]);
+        return;
+    }
+    if payload {
+        literal(node, source, out);
         return;
     }
     if node.is_named() {
@@ -202,6 +206,27 @@ fn serialize(node: Node, source: &[u8], out: &mut Vec<u8>) {
     if node.is_named() {
         out.push(b')');
     }
+}
+
+/// A literal is verbatim text, except embedded code (template substitutions, C# interpolations),
+/// which is serialized like any other code.
+fn literal(node: Node, source: &[u8], out: &mut Vec<u8>) {
+    out.push(b'(');
+    let mut at = node.start_byte();
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if matches!(child.kind(), "template_substitution" | "interpolation") {
+            if at < child.start_byte() {
+                token(out, &source[at..child.start_byte()]);
+            }
+            serialize(child, source, out);
+            at = child.end_byte();
+        }
+    }
+    if at < node.end_byte() {
+        token(out, &source[at..node.end_byte()]);
+    }
+    out.push(b')');
 }
 
 fn token(out: &mut Vec<u8>, bytes: &[u8]) {
