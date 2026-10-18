@@ -1,0 +1,38 @@
+---
+title: dinyd · 빌드 · 배포와 실행 경계
+config:
+  look: handDrawn
+  handDrawnSeed: 5
+  theme: dark
+  themeVariables:
+    mainBkg: "#333333"
+    clusterBkg: "#242424"
+  themeCSS: |
+    small { display: inline-block; text-align: left; }
+  flowchart:
+    wrappingWidth: 300
+---
+%% Behavior authority: 이 다이어그램.
+%% Rust로 구현한다. rust-toolchain.toml로 compiler를 고정하고 rust-version을 같은 값으로 둔다. Cargo.lock을 commit한다. MIT · Apache-2.0 dual license.
+%% grammar는 외부 tree-sitter crate를 쓰고 Cargo.lock으로 고정한다.
+%% CI는 linux · macOS · Windows에서 build와 test만 돌린다.
+%% 사용하는 프로젝트는 바이너리를 subprocess로 실행한다. dinyd는 호출한 쪽의 파일 목록을 받지 않고 선택한 판정 기준(index · commit · working tree)의 문서·대상을 직접 읽으므로, 다른 gate 도구(ytif 등)의 파일 범위나 diff 필터에 영향받지 않는다. 연결 방식은 사용하는 프로젝트가 정한다.
+flowchart LR
+  Tag["version tag push"]
+  subgraph Build["GitHub Actions · dist"]
+    Matrix["플랫폼별 빌드<br/><small>• linux x64 · arm64 (musl)<br/>• macOS arm64 · x64<br/>• Windows x64</small>"]
+    Release@{ shape: docs, label: "GitHub Releases<br/><small>archive · checksum</small>" }
+    Matrix --> Release
+  end
+  subgraph Consumer["사용하는 프로젝트"]
+    Invoke["dinyd 실행<br/><small>• gate · 작업 중 확인<br/>• exit code로 판정</small>"]
+    GitBin@{ shape: fr-rect, label: "git<br/><small>실행 시 필요</small>" }
+    Invoke --> GitBin
+  end
+  Tag --> Matrix
+  Release --> Invoke
+
+  classDef em fill:#173d25,stroke:#86efac
+  classDef file fill:#3d3415,stroke:#fcd34d
+  class Invoke em
+  class Release file

@@ -1,0 +1,42 @@
+---
+title: dinyd · check 판정
+config:
+  look: handDrawn
+  handDrawnSeed: 5
+  theme: dark
+  themeVariables:
+    mainBkg: "#333333"
+    clusterBkg: "#242424"
+  themeCSS: |
+    small { display: inline-block; text-align: left; }
+  flowchart:
+    wrappingWidth: 300
+---
+%% Behavior authority: 이 다이어그램과 anchors.mermaid.
+%% 판정 기준: --index(기본 · gate용) · --worktree(작업 중 확인용) · --rev commit. 문서와 대상은 같은 판정 기준에서 읽는다. --index와 --rev는 Git CLI(ls-files --stage -z · ls-tree -r -z --full-tree · cat-file --batch)로 읽고 GIT_INDEX_FILE을 따른다. --worktree는 디스크 내용을 읽는다.
+%% 검사 범위: 전체(기본 · gate용) · --changed [--base rev]. --changed는 바뀐 문서의 anchor와 대상 경로가 바뀐 anchor(삭제 · rename 포함)만 고른다. --base가 없으면 HEAD 대비이고, --rev와 함께 쓰면 --base가 필요하다. 형식이 깨진 anchor는 항상 포함한다.
+%% 유효하지 않음: 형식 오류(malformed), 대상 없음 · 2개 이상 · 허용되지 않는 항목(symlink · gitlink · --index의 intent-to-add · --index · --worktree의 unmerged) · 파싱 실패(unresolved). dinyd-ref는 디렉터리도 대상으로 허용한다.
+%% digest는 anchor에 기록된 방식(s1 · b1)으로 다시 계산한다.
+%% 실패 출력은 anchor마다 한 줄(문서 경로 → selector: 결과 + 다음 할 일)이고 줄 번호 · 문서 내용은 없다. 사용법 · 읽기 오류는 exit 2와 stderr다.
+flowchart LR
+  Collect["anchor 모으기<br/><small>• 판정 기준에서 문서 · 대상 읽기<br/>• 전체 또는 --changed</small>"]
+  Found{"참조와 대상이 유효한가"}
+  Digest{"digest"}
+  Ok["ok"]
+
+  subgraph Fail["exit 1 · 문서를 열어야 함"]
+    Broken["malformed · unresolved<br/><small>claim과 참조를 다시 판단</small>"]
+    Undeclared["undeclared<br/><small>update로 digest를 채운다</small>"]
+    Stale["stale<br/><small>claim을 다시 판단하고 update</small>"]
+  end
+
+  Collect --> Found
+  Found -->|아니오| Broken
+  Found -->|예 · dinyd-ref| Ok
+  Found -->|예 · dinyd| Digest
+  Digest -->|없음| Undeclared
+  Digest -->|다름| Stale
+  Digest -->|같음| Ok
+
+  classDef em fill:#173d25,stroke:#86efac
+  class Fail em
