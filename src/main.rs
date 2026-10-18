@@ -137,7 +137,7 @@ fn run(command: Command) -> Result<ExitCode, Error> {
             reference,
             basis,
         } => {
-            let text = edit::apply(
+            let (text, basis) = edit::apply(
                 &repo,
                 ApplyRequest {
                     doc: &doc,
@@ -149,6 +149,7 @@ fn run(command: Command) -> Result<ExitCode, Error> {
                 },
             )?;
             println!("{text}");
+            eprintln!("dinyd: target read from {basis}");
             Ok(ExitCode::SUCCESS)
         }
         Command::Update {

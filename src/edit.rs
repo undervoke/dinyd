@@ -16,8 +16,8 @@ pub struct ApplyRequest<'a> {
     pub basis: Basis,
 }
 
-/// Writes a new anchor and returns its text.
-pub fn apply(repo: &Repo, request: ApplyRequest) -> Result<String, Error> {
+/// Writes a new anchor and returns its text with the basis its digest came from.
+pub fn apply(repo: &Repo, request: ApplyRequest) -> Result<(String, String), Error> {
     let (doc, kind, source) = read_doc(repo, request.doc)?;
     let selector = anchor::parse_selector(request.selector)
         .ok_or_else(|| Error::Usage(format!("malformed selector: {}", request.selector)))?;
@@ -105,7 +105,7 @@ pub fn apply(repo: &Repo, request: ApplyRequest) -> Result<String, Error> {
         )));
     }
     write_doc(repo, &doc, &updated)?;
-    Ok(text)
+    Ok((text, basis))
 }
 
 pub struct UpdateRequest<'a> {

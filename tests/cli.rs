@@ -728,3 +728,83 @@ fn css_strings_are_exact_in_rule_selectors() {
         )]
     );
 }
+
+#[test]
+fn vue_reads_only_top_level_script_elements() {
+    let repo = Repo::new();
+    let live = "<template><div/></template>\n<script setup lang = \"ts\">\nfunction f(n: number) { return n }\n</script>\n";
+    repo.write("v.vue", live);
+    repo.write("doc.md", "f claim.\n");
+    repo.git(&["add", "-A"]);
+    repo.apply("doc.md", 1, "v.vue#f", &[]);
+    repo.git(&["add", "-A"]);
+    assert_eq!(repo.check(&[]).code, 0);
+
+    let commented = live
+        .replace("<script", "<!-- <script")
+        .replace("</script>", "</script> -->");
+    repo.write("v.vue", &commented);
+    assert_eq!(
+        repo.check(&["--worktree"]).lines(),
+        [format!("doc.md → v.vue#f: {UNRESOLVED}")]
+    );
+}
+
+#[test]
+fn broken_anchors_fail_without_echoing_digests() {
+    let repo = Repo::new();
+    repo.write("a.ts", "export function f() {}\n");
+    repo.write(
+        "doc.md",
+        "Mode <!-- dinyd: a.ts#f s2:0123456789abcdef -->\n\n<!-- dinyd: a.ts s1:fedcba9876543210",
+    );
+    repo.git(&["add", "-A"]);
+    let run = repo.check(&[]);
+    assert_eq!(
+        run.lines(),
+        [
+            format!("doc.md → a.ts#f: {MALFORMED}"),
+            format!("doc.md → a.ts: {MALFORMED}"),
+        ]
+    );
+    assert!(!run.stdout.contains("0123456789abcdef") && !run.stdout.contains("fedcba9876543210"));
+}
+
+#[test]
+fn worktree_rejects_gitlinks_like_the_index() {
+    let repo = Repo::new();
+    repo.write("vendor/lib/file.txt", "x\n");
+    repo.write("doc.md", "Vendored <!-- dinyd-ref: vendor/lib -->\n");
+    repo.git(&["add", "doc.md"]);
+    let head = "0123456789012345678901234567890123456789";
+    repo.git(&[
+        "update-index",
+        "--add",
+        "--cacheinfo",
+        &format!("160000,{head},vendor/lib"),
+    ]);
+    let expected = [format!("doc.md → vendor/lib: {UNRESOLVED}")];
+    assert_eq!(repo.check(&["--index"]).lines(), expected);
+    assert_eq!(repo.check(&["--worktree"]).lines(), expected);
+}
+
+#[test]
+fn b1_hashes_exactly_the_selected_bytes_and_apply_names_its_basis() {
+    let repo = Repo::new();
+    repo.write("cfg.json", "{\"a\":1}\n");
+    repo.write("doc.md", "a is one.\n");
+    repo.git(&["add", "-A"]);
+    let run = repo.dinyd(&[
+        "apply",
+        "doc.md",
+        "--line",
+        "1",
+        "--selector",
+        "cfg.json#/a",
+        "--bytes",
+    ]);
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    // SHA-256("1") starts with 6b86b273ff34fce1.
+    assert_eq!(run.stdout.trim(), "dinyd: cfg.json#/a b1:6b86b273ff34fce1");
+    assert!(run.stderr.contains("--index"), "{}", run.stderr);
+}

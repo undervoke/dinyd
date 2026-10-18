@@ -126,14 +126,13 @@ pub fn digest(
         }
     };
     let mode = mode.unwrap_or(Mode::S1);
+    // A name(*) group is one region: its members' contents in source order.
     let mut hasher = Sha256::new();
     for region in &regions {
-        let part = match mode {
-            Mode::S1 => region.tokens.clone(),
-            Mode::B1 => crlf_to_lf(&source[region.range.clone()]),
-        };
-        hasher.update((part.len() as u64).to_le_bytes());
-        hasher.update(&part);
+        match mode {
+            Mode::S1 => hasher.update(&region.tokens),
+            Mode::B1 => hasher.update(crlf_to_lf(&source[region.range.clone()])),
+        }
     }
     Ok((mode, hex(&hasher.finalize())))
 }
@@ -683,36 +682,161 @@ fn vue_regions(source: &[u8], location: &str) -> Result<Vec<Region>, Failure> {
     Ok(regions)
 }
 
-/// Content ranges of top-level `<script>` blocks with their script format.
+/// Content ranges of top-level `<script>` blocks with their script format. Only top-level
+/// elements count; HTML comments and nested markup are skipped.
 fn vue_scripts(source: &[u8]) -> Vec<(Range<usize>, Format)> {
-    let text = String::from_utf8_lossy(source);
+    let Ok(text) = std::str::from_utf8(source) else {
+        return Vec::new();
+    };
     let mut blocks = Vec::new();
     let mut at = 0;
-    while let Some(open) = text[at..].find("<script") {
-        let tag_start = at + open;
-        let after = text[tag_start + 7..].chars().next();
-        if !after.is_some_and(|c| c == '>' || c.is_whitespace()) {
-            at = tag_start + 7;
+    while let Some(lt) = text[at..].find('<') {
+        let start = at + lt;
+        if text[start..].starts_with("<!--") {
+            match text[start + 4..].find("-->") {
+                Some(end) => at = start + 4 + end + 3,
+                None => break,
+            }
             continue;
         }
-        let Some(tag_end) = text[tag_start..].find('>').map(|i| tag_start + i + 1) else {
+        let Some(tag) = start_tag(text, start) else {
+            at = start + 1;
+            continue;
+        };
+        if tag.self_closing {
+            at = tag.end;
+            continue;
+        }
+        let raw = matches!(tag.name, "script" | "style");
+        let Some((close, after)) = closing_tag(text, tag.end, tag.name, raw) else {
             break;
         };
-        let Some(close) = text[tag_end..].find("</script>").map(|i| tag_end + i) else {
-            break;
-        };
-        let tag = &text[tag_start..tag_end];
-        let format = if tag.contains("lang=\"tsx\"") || tag.contains("lang='tsx'") {
-            Format::Tsx
-        } else if tag.contains("lang=\"ts\"") || tag.contains("lang='ts'") {
-            Format::TypeScript
-        } else {
-            Format::JavaScript
-        };
-        blocks.push((tag_end..close, format));
-        at = close + 9;
+        if tag.name == "script" {
+            let format = match tag.lang.as_deref() {
+                Some("ts") => Format::TypeScript,
+                Some("tsx") => Format::Tsx,
+                _ => Format::JavaScript,
+            };
+            blocks.push((tag.end..close, format));
+        }
+        at = after;
     }
     blocks
+}
+
+struct StartTag<'s> {
+    name: &'s str,
+    lang: Option<String>,
+    self_closing: bool,
+    /// Offset just past `>`.
+    end: usize,
+}
+
+fn start_tag(text: &str, start: usize) -> Option<StartTag<'_>> {
+    let rest = &text[start + 1..];
+    let name_len = rest
+        .find(|c: char| c.is_whitespace() || c == '>' || c == '/')
+        .unwrap_or(rest.len());
+    let name = &rest[..name_len];
+    if name.is_empty() || !name.starts_with(|c: char| c.is_ascii_alphabetic()) {
+        return None;
+    }
+    let mut chars = rest[name_len..].char_indices().peekable();
+    let mut lang = None;
+    let mut self_closing = false;
+    loop {
+        let (i, c) = chars.next()?;
+        match c {
+            '>' => {
+                return Some(StartTag {
+                    name,
+                    lang,
+                    self_closing,
+                    end: start + 1 + name_len + i + 1,
+                });
+            }
+            '/' => self_closing = true,
+            c if c.is_whitespace() => {}
+            _ => {
+                self_closing = false;
+                let mut key = c.to_string();
+                while let Some(&(_, k)) = chars.peek() {
+                    if k.is_whitespace() || matches!(k, '=' | '>' | '/') {
+                        break;
+                    }
+                    key.push(k);
+                    chars.next();
+                }
+                while chars.peek().is_some_and(|&(_, k)| k.is_whitespace()) {
+                    chars.next();
+                }
+                if chars.peek().is_some_and(|&(_, k)| k == '=') {
+                    chars.next();
+                    while chars.peek().is_some_and(|&(_, k)| k.is_whitespace()) {
+                        chars.next();
+                    }
+                    let mut value = String::new();
+                    match chars.peek().map(|&(_, k)| k) {
+                        Some(q @ ('"' | '\'')) => {
+                            chars.next();
+                            for (_, k) in chars.by_ref() {
+                                if k == q {
+                                    break;
+                                }
+                                value.push(k);
+                            }
+                        }
+                        _ => {
+                            while let Some(&(_, k)) = chars.peek() {
+                                if k.is_whitespace() || k == '>' {
+                                    break;
+                                }
+                                value.push(k);
+                                chars.next();
+                            }
+                        }
+                    }
+                    if key.eq_ignore_ascii_case("lang") {
+                        lang = Some(value);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Offset of the `</name` closing an element opened before `from`, and the offset past its `>`.
+/// Raw-text elements end at the first `</name`; others count nested same-named elements.
+fn closing_tag(text: &str, from: usize, name: &str, raw: bool) -> Option<(usize, usize)> {
+    let close = format!("</{name}");
+    let mut depth = 0;
+    let mut at = from;
+    loop {
+        let lt = at + text[at..].find('<')?;
+        let rest = &text[lt..];
+        if !raw && rest.starts_with("<!--") {
+            at = lt + 4 + text[lt + 4..].find("-->")? + 3;
+        } else if rest.starts_with(&close) && is_name_end(&rest[close.len()..]) {
+            let after = lt + rest.find('>')? + 1;
+            if depth == 0 {
+                return Some((lt, after));
+            }
+            depth -= 1;
+            at = after;
+        } else if !raw && rest[1..].starts_with(name) && is_name_end(&rest[1 + name.len()..]) {
+            let tag = start_tag(text, lt)?;
+            if !tag.self_closing {
+                depth += 1;
+            }
+            at = tag.end;
+        } else {
+            at = lt + 1;
+        }
+    }
+}
+
+fn is_name_end(rest: &str) -> bool {
+    rest.starts_with(|c: char| c.is_whitespace() || c == '>' || c == '/')
 }
 
 // ---- JSON / YAML pointers ----

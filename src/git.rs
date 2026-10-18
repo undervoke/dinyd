@@ -188,8 +188,11 @@ impl<'r> Snapshot<'r> {
             .iter()
             .filter(|(path, _)| crate::anchor::DocKind::of(path).is_some())
             .filter(|(path, entry)| match self.basis {
+                // Unmerged documents are read from disk too: their anchors are there.
                 Basis::Worktree => {
-                    !matches!(entry, Entry::Unmerged) && self.repo.disk_path(path).is_file()
+                    !matches!(entry, Entry::Gitlink | Entry::Symlink)
+                        && std::fs::symlink_metadata(self.repo.disk_path(path))
+                            .is_ok_and(|m| m.is_file())
                 }
                 _ => matches!(entry, Entry::File(_)),
             })
@@ -200,7 +203,10 @@ impl<'r> Snapshot<'r> {
     pub fn lookup(&self, path: &str) -> Lookup {
         match self.basis {
             Basis::Worktree => {
-                if matches!(self.entries.get(path), Some(Entry::Unmerged)) {
+                if matches!(
+                    self.entries.get(path),
+                    Some(Entry::Unmerged | Entry::Gitlink | Entry::Symlink)
+                ) {
                     return Lookup::Rejected;
                 }
                 match std::fs::symlink_metadata(self.repo.disk_path(path)) {

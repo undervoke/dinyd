@@ -102,6 +102,12 @@ fn scan_markdown(src: &str) -> Vec<Anchor> {
         while let Some(open) = src[at..region.end].find("<!--") {
             let body_start = at + open + 4;
             let Some(close) = src[body_start..region.end].find("-->") else {
+                // An anchor whose terminator was lost still counts, as malformed.
+                let body = body_start..region.end;
+                if let Some(mut anchor) = parse_body(src, body, lines.line(at + open)) {
+                    anchor.selector = None;
+                    anchors.push(anchor);
+                }
                 break;
             };
             let body_end = body_start + close;
@@ -174,21 +180,21 @@ fn parse_body(src: &str, body: Range<usize>, line: usize) -> Option<Anchor> {
         .map(|i| i + content[i..].chars().next().unwrap().len_utf8())
         .unwrap_or(0);
     let last_token = &content[last_token_start..];
-    if last_token.starts_with("s1:") || last_token.starts_with("b1:") {
-        let mode = if last_token.starts_with("s1:") {
-            Mode::S1
-        } else {
-            Mode::B1
+    if is_digest_token(last_token) {
+        let (mode, value) = last_token.split_once(':').unwrap_or(("", last_token));
+        let mode = match mode {
+            "s1" => Some(Mode::S1),
+            "b1" => Some(Mode::B1),
+            _ => None,
         };
-        let value = &last_token[3..];
         let valid = value.len() == 16
             && value
                 .bytes()
                 .all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'));
-        if kind == Kind::Ref || !valid {
-            malformed = true;
+        match mode {
+            Some(mode) if valid && kind == Kind::Digest => digest = Some((mode, value.to_string())),
+            _ => malformed = true,
         }
-        digest = Some((mode, value.to_string()));
         digest_span = Some(content_start + last_token_start..content_end);
         selector_end = content_start + content[..last_token_start].trim_end().len();
     }
@@ -207,6 +213,21 @@ fn parse_body(src: &str, body: Range<usize>, line: usize) -> Option<Anchor> {
         selector_span: content_start..selector_end,
         digest_span,
     })
+}
+
+/// A trailing `mode:value` or bare 16-hex token: digest metadata, never part of the selector,
+/// so a malformed digest is not printed back as selector text.
+fn is_digest_token(token: &str) -> bool {
+    if token.starts_with("s1:") || token.starts_with("b1:") {
+        return true;
+    }
+    let hex = |v: &str| !v.is_empty() && v.bytes().all(|b| b.is_ascii_hexdigit());
+    match token.split_once(':') {
+        Some((mode, value)) => {
+            !mode.is_empty() && mode.bytes().all(|b| b.is_ascii_alphanumeric()) && hex(value)
+        }
+        None => token.len() == 16 && hex(token),
+    }
 }
 
 /// `path#location`; `None` when the selector violates the path rules.
