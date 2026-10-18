@@ -88,7 +88,7 @@ pub fn check(repo: &Repo, basis: Basis, scope: Scope) -> Result<Vec<Finding>, Er
             if verdict != Verdict::Ok {
                 findings.push(Finding {
                     doc: doc.clone(),
-                    selector: anchor.display_selector().to_string(),
+                    selector: anchor.display_selector(),
                     verdict,
                     reason,
                 });

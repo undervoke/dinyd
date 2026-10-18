@@ -856,3 +856,33 @@ fn unterminated_anchors_stay_on_their_own_line() {
     assert!(!run.stdout.contains("0123456789abcdef") && !run.stdout.contains("fedcba9876543210"));
     assert!(!run.stdout.contains("Claim") && !run.stdout.contains("must stay"));
 }
+
+#[test]
+fn a_lost_terminator_before_another_anchor_and_escaped_examples() {
+    let repo = Repo::new();
+    repo.write("a.ts", "export function f() {}\n");
+    repo.write("b.ts", "export function g() {}\n");
+    repo.write("doc.md", "Claim B.\n");
+    repo.git(&["add", "-A"]);
+    let b = repo.apply("doc.md", 1, "b.ts", &[]);
+    repo.write(
+        "doc.md",
+        &format!(
+            "<!-- dinyd: a.ts s1:0123456789abcdef\nClaim B. <!-- {b} -->\n\nThe notation is \\<!-- dinyd: a.ts -->.\n"
+        ),
+    );
+    repo.write(
+        "multi.md",
+        "<!-- dinyd: a.ts s1:0123456789abcdef\nClaim C.\n-->\n",
+    );
+    repo.git(&["add", "-A"]);
+    let run = repo.check(&[]);
+    assert_eq!(
+        run.lines(),
+        [
+            format!("doc.md → a.ts: {MALFORMED}"),
+            format!("multi.md → a.ts: {MALFORMED}"),
+        ]
+    );
+    assert!(!run.stdout.contains("0123456789abcdef") && !run.stdout.contains("Claim"));
+}

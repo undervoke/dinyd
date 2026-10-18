@@ -47,14 +47,27 @@ pub struct Anchor {
     pub line: usize,
     pub selector_span: Range<usize>,
     pub digest_span: Option<Range<usize>>,
+    /// False when the comment's terminator was lost.
+    pub terminated: bool,
 }
 
 impl Anchor {
-    /// Selector text for output: one line, so a broken comment cannot carry prose along.
-    pub fn display_selector(&self) -> &str {
-        let text = &self.selector_text;
-        text.find(['\n', '\r'])
-            .map_or(text, |i| text[..i].trim_end())
+    /// Selector text for output, never carrying digest metadata or prose. A malformed anchor in
+    /// a closed one-line comment shows its non-digest tokens; one whose comment lost its
+    /// terminator or spans lines shows only the first, since what follows may be prose.
+    pub fn display_selector(&self) -> String {
+        if self.selector.is_some() {
+            return self.selector_text.clone();
+        }
+        let mut tokens = self
+            .selector_text
+            .split_whitespace()
+            .filter(|t| !is_digest_token(t));
+        if self.terminated && !self.selector_text.contains(['\n', '\r']) {
+            tokens.collect::<Vec<_>>().join(" ")
+        } else {
+            tokens.next().unwrap_or("").to_string()
+        }
     }
 }
 
@@ -120,6 +133,12 @@ fn scan_markdown(src: &str) -> Vec<Anchor> {
                 break;
             };
             let body_end = body_start + close;
+            // `<!--` cannot occur inside a comment: the earlier one lost its terminator.
+            if let Some(nested) = src[body_start..body_end].find("<!--") {
+                anchors.extend(unterminated(src, body_start, body_start + nested, &lines));
+                at = body_start + nested;
+                continue;
+            }
             if let Some(anchor) = parse_body(src, body_start..body_end, lines.line(at + open)) {
                 anchors.push(anchor);
             }
@@ -130,7 +149,15 @@ fn scan_markdown(src: &str) -> Vec<Anchor> {
         let mut at = region.start;
         while let Some(open) = src[at..region.end].find("<!--") {
             let body_start = at + open + 4;
-            anchors.extend(unterminated(src, body_start, region.end, &lines));
+            // An odd run of backslashes escapes `<`: a literal example, not a comment.
+            let escapes = src[..at + open]
+                .bytes()
+                .rev()
+                .take_while(|&b| b == b'\\')
+                .count();
+            if escapes % 2 == 0 {
+                anchors.extend(unterminated(src, body_start, region.end, &lines));
+            }
             at = body_start;
         }
     }
@@ -146,6 +173,7 @@ fn unterminated(src: &str, body_start: usize, end: usize, lines: &LineIndex) -> 
         .map_or(end, |i| body_start + i);
     let mut anchor = parse_body(src, body_start..line_end, lines.line(body_start))?;
     anchor.selector = None;
+    anchor.terminated = false;
     Some(anchor)
 }
 
@@ -241,6 +269,7 @@ fn parse_body(src: &str, body: Range<usize>, line: usize) -> Option<Anchor> {
         line,
         selector_span: content_start..selector_end,
         digest_span,
+        terminated: true,
     })
 }
 
