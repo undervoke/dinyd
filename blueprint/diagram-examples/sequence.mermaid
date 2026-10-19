@@ -1,0 +1,75 @@
+---
+title: Example · sequence diagram
+config:
+  look: classic
+  theme: dark
+  themeVariables:
+    actorBkg: "#333333"
+    labelBoxBkgColor: "#fcd34d"
+    labelTextColor: "#000000"
+    noteTextColor: "#e0e0e0"
+  themeCSS: |
+    /* database · db */
+    g.actor[transform] path { fill: #1c2f4a; stroke: #93c5fd; }
+    /* queue */
+    g.actor g[transform] path { fill: #2e2650; stroke: #c4b5fd; }
+    /* database label clears the cylinder */
+    g.actor[transform] + text { transform: translateY(12px); }
+    g.actor[transform] + text tspan { paint-order: stroke; stroke: #1f1f1f; stroke-width: 6px; }
+    /* collections · file */
+    rect.actor:not([rx]) { fill: #3d3415; stroke: #fcd34d; }
+  sequence:
+    actorMargin: 80
+    width: 200
+    wrap: true
+---
+%% Behavior authority: <domain>.md.
+sequenceDiagram
+  autonumber
+  actor User as developer
+  box rgb(36, 36, 36) COA · system boundary
+    participant Runtime as runtime<br/>call handling
+    participant Worker as worker
+  end
+  participant DB@{ "type": "database", "alias": "state DB" }
+  participant Queue@{ "type": "queue", "alias": "delivery queue" }
+  participant Logs@{ "type": "collections", "alias": "native logs" }
+
+  User->>+Runtime: task request
+  Runtime->>Runtime: check input·permissions
+  critical accept transaction
+    Runtime->>DB: store operation
+  option store failed
+    Runtime-->>User: synchronous error
+  end
+  Runtime-)Worker: run notice · no wait for a reply
+  Runtime-->>-User: accepted reply
+
+  rect rgb(23, 61, 37)
+    Note right of Worker: em · the span being explained
+    loop until the final result
+      par collect events
+        Worker->>Logs: record run events
+      and report status
+        Worker->>DB: store progress
+      end
+    end
+  end
+
+  alt success
+    Worker->>Queue: publish the result
+    Queue--)User: asynchronous delivery
+  else publish failed
+    rect rgb(66, 35, 35)
+      Worker-xQueue: publish rejected · issue
+    end
+  end
+
+  opt cancel request
+    User->>Runtime: cancel
+    break already finished
+      Runtime-->>User: existing final state
+    end
+  end
+
+  Note over Runtime,DB: • a note spanning participants<br/>• one line per distinct statement

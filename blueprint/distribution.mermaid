@@ -12,11 +12,7 @@ config:
   flowchart:
     wrappingWidth: 300
 ---
-%% Behavior authority: this diagram.
-%% Implemented in Rust. rust-toolchain.toml pins the compiler, and rust-version holds the same value. Cargo.lock is committed. MIT · Apache-2.0 dual license.
-%% Grammars come from external tree-sitter crates, pinned by Cargo.lock.
-%% CI runs only build and test, on linux · macOS · Windows.
-%% The consuming project runs the binary as a subprocess. dinyd takes no file list from its caller and reads documents · targets directly from the chosen basis (index · commit · working tree), so other gate tools' (ytif, etc.) file scopes or diff filters do not affect it. The consuming project decides how to wire it.
+%% Behavior authority: distribution.md.
 flowchart LR
   Tag["version tag push"]
   subgraph Build["GitHub Actions · dist"]

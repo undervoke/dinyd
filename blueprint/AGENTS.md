@@ -1,42 +1,19 @@
 # Blueprint
 
-dinyd's design. Each diagram owns one axis, and its `%%` comments hold the behavior authority.
+State each point once and link to its owner elsewhere.
 
-dinyd ties a claim in a document to the code region that is its evidence. When code changes and a reference drifts, dinyd leads the worker (person · agent) to open the document and designate the reference, and only that updates it. Reading and judging are the worker's; dinyd does not deliver document content in its output. dinyd provides only the verdict and update logic, and the consuming project decides where to call it.
+## Layers
+
+- Documents own decisions, rationale, and intended boundaries that cannot be inferred from code.
+- Diagrams explain cross-file and process relationships at an abstraction level that avoids copying code literals.
+- Code owns implementation facts; link to their source instead of maintaining parallel inventories or configuration values.
+- Topic documents import their diagrams.
+- Keep each independently reviewable claim on its own physical line.
 
 ## Diagrams
 
-- `.mermaid` only; MPE `@import` treats `.mmd` as plain code. Palette targets the VS Code dark background `#1f1f1f`.
-- Leading `%%` names the behavior authority.
-- English text, identifiers verbatim. Frontmatter `title`; group titles instead of legends.
-- Node: `heading<br/><small>detail</small>`. Two or more distinct statements: one `• ` line each; one `A → B → C` chain stays one line.
-- Achromatic by default. Color only for `em` (focus), `issue` (observed defect), `legacy` (superseded), and infrastructure kinds `db` · `cache` · `queue` · `file` · `ext`. No per-node `style`, so palette edits stay in `classDef` and frontmatter.
-- Copy frontmatter and `classDef`s from an existing diagram of the same type.
-
-## anchors
-
-The two kinds of references a document holds (digest anchor · delegation), per-format selectors, document units, links, and digest modes.
-
-@import "anchors.mermaid"
-
-## check
-
-Verdicts: for each anchor, find the target and compare digests to separate ok from failures, and set the worker's next step for each failure.
-
-@import "check.mermaid"
-
-## apply-update
-
-Creating and updating relationships: when the worker opens the document and designates the claim line and its evidence, apply writes the anchor and first digest; after a check failure, update rewrites the digest.
-
-@import "apply-update.mermaid"
-
-## distribution
-
-Build · release, and the boundary where a consuming project runs dinyd.
-
-@import "distribution.mermaid"
-
-## Extensions under consideration
-
-To review after the first release: impact propagation along call relations, a reverse index, JSON output, a resident process, graph visualization.
+- `.mermaid` only; MPE `@import` treats `.mmd` as plain code.
+- A single leading `%%` names the owning document; additional comments are for rendering only.
+- Copy frontmatter and `classDef`s from the type's example in [diagram-examples](diagram-examples/); its rendering comments and on-canvas text explain the type's conventions.
+- Color only through those `classDef`s, never per-node `style`, so palette edits stay in `classDef` and frontmatter.
+- The palette targets the VS Code dark background `#1f1f1f`.

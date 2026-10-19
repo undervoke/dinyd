@@ -1,0 +1,33 @@
+---
+title: Example · state transitions
+config:
+  look: handDrawn
+  handDrawnSeed: 5
+  theme: dark
+  themeVariables:
+    mainBkg: "#333333"
+    edgeLabelBackground: "#1f1f1f"
+    noteBkgColor: "#333333"
+  themeCSS: |
+    small { color: #b3b3b3; display: inline-block; text-align: left; }
+---
+%% Owning document: <domain>.md.
+stateDiagram-v2
+  direction LR
+  state "Idle" as Idle
+  state "Running<br/><small>the key state is em</small>" as Running
+  state "Done" as Done
+
+  [*] --> Idle
+  Idle --> Running : request accepted
+  Running --> Done : success
+  Running --> Idle : failure<br/>[retryable]
+  Done --> [*]
+
+  note right of Running
+    • one bullet per statement
+    • notes follow the same rule
+  end note
+
+  classDef em fill:#173d25,stroke:#86efac
+  class Running em

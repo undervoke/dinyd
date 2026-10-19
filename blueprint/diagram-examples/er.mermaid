@@ -1,0 +1,19 @@
+---
+title: Example · table relationships
+config:
+  look: handDrawn
+  handDrawnSeed: 5
+  theme: dark
+---
+%% Owning document: <domain>.md.
+%% Attribute columns are fixed to type, name, key (`PK`/`FK`/`UK`), comment; the comment reads `description · e.g. value`.
+erDiagram
+  sessions {
+    TEXT id PK "session identifier · e.g. ses_8f3a"
+    TEXT lifecycle_state "lifecycle state · e.g. open, closed"
+  }
+  operations {
+    TEXT id PK "request identifier · e.g. op_2b71"
+    TEXT session_id FK "owning session · e.g. ses_8f3a"
+  }
+  sessions ||--o{ operations : "owns requests"

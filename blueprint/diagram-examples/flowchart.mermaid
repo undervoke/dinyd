@@ -1,0 +1,70 @@
+---
+title: Example · blueprint diagram rules
+config:
+  look: handDrawn
+  handDrawnSeed: 5
+  theme: dark
+  themeVariables:
+    mainBkg: "#333333"
+    clusterBkg: "#242424"
+  themeCSS: |
+    small { display: inline-block; text-align: left; }
+  flowchart:
+    wrappingWidth: 270
+---
+%% Behavior authority: <domain>.md.
+%% Infrastructure nodes: `id@{ shape: …, label: "…" }` with the shape and kind class shown here.
+%% Tune `flowchart.wrappingWidth` per diagram.
+flowchart LR
+  subgraph Source["shared attribute as the group name"]
+    Plain["plain node<br/><small>one statement takes no bullet</small>"]
+    Multi["several statements<br/><small>• one bullet per distinct statement<br/>• an ordered flow A → B → C stays one line</small>"]
+  end
+
+  Plain --> Focus["focus · em<br/><small>what the diagram explains</small>"]
+  Multi --> Defect["defect · issue<br/><small>an observed defect</small>"]
+  Multi --> Old["previous structure · legacy<br/><small>kept for compatibility</small>"]
+
+  subgraph Infra["infrastructure shapes"]
+    UI@{ shape: curv-trap, label: "screen<br/><small>curv-trap</small>" }
+    API@{ shape: st-rect, label: "API instances<br/><small>st-rect · replicas·pool</small>" }
+    Job@{ shape: hex, label: "batch job<br/><small>hex</small>" }
+    Proc@{ shape: fr-rect, label: "subprocess<br/><small>fr-rect</small>" }
+    DB@{ shape: cyl, label: "database · db<br/><small>cyl</small>" }
+    Vol@{ shape: lin-cyl, label: "volume·disk · db<br/><small>lin-cyl</small>" }
+    Cache@{ shape: bow-rect, label: "cache · cache<br/><small>bow-rect</small>" }
+    Mem@{ shape: win-pane, label: "in-memory state · cache<br/><small>win-pane</small>" }
+    Queue@{ shape: h-cyl, label: "queue·stream · queue<br/><small>h-cyl</small>" }
+    Conf@{ shape: doc, label: "config file · file<br/><small>doc</small>" }
+    Logs@{ shape: docs, label: "logs·file set · file<br/><small>docs</small>" }
+    SaaS@{ shape: cloud, label: "external service · ext<br/><small>cloud</small>" }
+    UI --> API
+    Conf --> API
+    API --> DB
+    API --> Cache
+    API --> Mem
+    API --> SaaS
+    API --> Queue --> Job
+    Job --> Proc
+    Job --> Vol
+    Job --> Logs
+  end
+
+  Focus --> API
+
+  classDef em fill:#173d25,stroke:#86efac
+  classDef issue fill:#422323,stroke:#fca5a5
+  classDef legacy opacity:0.5,stroke-dasharray:4 3
+  classDef db fill:#1c2f4a,stroke:#93c5fd
+  classDef cache fill:#163a40,stroke:#67e8f9
+  classDef queue fill:#2e2650,stroke:#c4b5fd
+  classDef file fill:#3d3415,stroke:#fcd34d
+  classDef ext fill:#40291a,stroke:#fdba74
+  class Focus em
+  class Defect issue
+  class Old legacy
+  class DB,Vol db
+  class Cache,Mem cache
+  class Queue queue
+  class Conf,Logs file
+  class SaaS ext
