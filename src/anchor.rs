@@ -10,6 +10,8 @@ pub enum Kind {
     Digest,
     /// `dinyd-ref:` — a delegation; only existence is checked.
     Ref,
+    /// `dinyd-id:` or `/dinyd-id:` — a unit boundary; scan yields one only when malformed.
+    Declaration,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -18,6 +20,8 @@ pub enum Mode {
     S1,
     /// Bytes after CRLF -> LF.
     B1,
+    /// A document unit's bytes after CRLF -> LF, with dinyd comments projected out.
+    D1,
 }
 
 impl Mode {
@@ -25,6 +29,7 @@ impl Mode {
         match self {
             Mode::S1 => "s1",
             Mode::B1 => "b1",
+            Mode::D1 => "d1",
         }
     }
 }
@@ -89,17 +94,113 @@ impl DocKind {
     }
 }
 
-pub fn scan(kind: DocKind, src: &str) -> Vec<Anchor> {
-    match kind {
-        DocKind::Markdown => scan_markdown(src),
-        DocKind::Mermaid => scan_mermaid(src),
+/// A comment outside code, where anchors and unit declarations live.
+pub struct Comment {
+    /// The whole comment: `<!--` through `-->`, or `%%` through the end of its line.
+    pub extent: Range<usize>,
+    body: Range<usize>,
+    line: usize,
+    /// False when the comment's terminator was lost.
+    pub terminated: bool,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Keyword {
+    Digest,
+    Ref,
+    Start,
+    End,
+}
+
+const KEYWORDS: [(&str, Keyword); 4] = [
+    ("dinyd:", Keyword::Digest),
+    ("dinyd-ref:", Keyword::Ref),
+    ("dinyd-id:", Keyword::Start),
+    ("/dinyd-id:", Keyword::End),
+];
+
+impl Comment {
+    /// The dinyd keyword opening the body and the offset just past it.
+    pub fn keyword(&self, src: &str) -> Option<(Keyword, usize)> {
+        let text = &src[self.body.clone()];
+        let lead = text.len() - text.trim_start().len();
+        KEYWORDS
+            .iter()
+            .find(|(word, _)| text[lead..].starts_with(word))
+            .map(|(word, keyword)| (*keyword, self.body.start + lead + word.len()))
+    }
+
+    /// A well-formed unit boundary: whether it ends the unit, and the unit's name.
+    pub fn declaration<'s>(&self, src: &'s str) -> Option<(bool, &'s str)> {
+        let (keyword, rest) = self.keyword(src)?;
+        let name = src[rest..self.body.end].trim();
+        let end = match keyword {
+            Keyword::Start => false,
+            Keyword::End => true,
+            _ => return None,
+        };
+        (self.terminated && is_name(name)).then_some((end, name))
+    }
+
+    /// The anchor this comment holds; a malformed declaration counts as one so check reports it.
+    fn anchor(&self, src: &str) -> Option<Anchor> {
+        let (keyword, rest) = self.keyword(src)?;
+        let mut anchor = match keyword {
+            Keyword::Digest => parse_reference(src, Kind::Digest, rest..self.body.end, self.line),
+            Keyword::Ref => parse_reference(src, Kind::Ref, rest..self.body.end, self.line),
+            Keyword::Start | Keyword::End => {
+                if self.declaration(src).is_some() {
+                    return None;
+                }
+                let body = &src[self.body.clone()];
+                let start = self.body.start + body.len() - body.trim_start().len();
+                let text = body.trim();
+                Anchor {
+                    kind: Kind::Declaration,
+                    selector_text: text.to_string(),
+                    selector: None,
+                    digest: None,
+                    line: self.line,
+                    selector_span: start..start + text.len(),
+                    digest_span: None,
+                    terminated: true,
+                }
+            }
+        };
+        if !self.terminated {
+            anchor.selector = None;
+            anchor.terminated = false;
+        }
+        Some(anchor)
     }
 }
 
-/// Anchors in HTML comments anywhere outside code. The parser supplies only the code to skip
+/// A unit name: ASCII letters, digits, `_`, `.`, `-`.
+fn is_name(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'.' | b'-'))
+}
+
+pub fn scan(kind: DocKind, src: &str) -> Vec<Anchor> {
+    comments(kind, src)
+        .iter()
+        .filter_map(|c| c.anchor(src))
+        .collect()
+}
+
+pub fn comments(kind: DocKind, src: &str) -> Vec<Comment> {
+    match kind {
+        DocKind::Markdown => markdown_comments(src),
+        DocKind::Mermaid => mermaid_comments(src),
+    }
+}
+
+/// HTML comments anywhere outside code. The parser supplies only the code to skip
 /// (fenced and indented blocks, inline code spans): it drops some comments from its events,
 /// such as one after a table row's last pipe, and an unterminated comment is not HTML to it.
-fn scan_markdown(src: &str) -> Vec<Anchor> {
+fn markdown_comments(src: &str) -> Vec<Comment> {
     let options = Options::ENABLE_TABLES
         | Options::ENABLE_STRIKETHROUGH
         | Options::ENABLE_TASKLISTS
@@ -116,7 +217,7 @@ fn scan_markdown(src: &str) -> Vec<Anchor> {
     };
 
     let lines = LineIndex::new(src);
-    let mut anchors = Vec::new();
+    let mut comments = Vec::new();
     let mut at = 0;
     while let Some(found) = src[at..].find("<!--") {
         let open = at + found;
@@ -142,37 +243,45 @@ fn scan_markdown(src: &str) -> Vec<Anchor> {
             .map(|i| body_start + i);
         match (close, nested) {
             (Some(body_end), None) => {
-                anchors.extend(parse_body(src, body_start..body_end, lines.line(open)));
+                comments.push(Comment {
+                    extent: open..body_end + 3,
+                    body: body_start..body_end,
+                    line: lines.line(open),
+                    terminated: true,
+                });
                 at = body_end + 3;
             }
             (_, Some(next)) => {
-                anchors.extend(unterminated(src, body_start, next, &lines));
+                comments.push(unterminated(src, open, next, &lines));
                 at = next;
             }
             (None, None) => {
-                anchors.extend(unterminated(src, body_start, src.len(), &lines));
+                comments.push(unterminated(src, open, src.len(), &lines));
                 break;
             }
         }
     }
-    anchors
+    comments
 }
 
-/// An anchor whose `-->` was lost still counts, as malformed. Its body is bounded to its own
+/// A comment whose `-->` was lost still counts, as malformed. Its body is bounded to its own
 /// line so that following prose never becomes selector text.
-fn unterminated(src: &str, body_start: usize, end: usize, lines: &LineIndex) -> Option<Anchor> {
+fn unterminated(src: &str, open: usize, end: usize, lines: &LineIndex) -> Comment {
+    let body_start = open + 4;
     let line_end = src[body_start..end]
         .find(['\n', '\r'])
         .map_or(end, |i| body_start + i);
-    let mut anchor = parse_body(src, body_start..line_end, lines.line(body_start))?;
-    anchor.selector = None;
-    anchor.terminated = false;
-    Some(anchor)
+    Comment {
+        extent: open..line_end,
+        body: body_start..line_end,
+        line: lines.line(body_start),
+        terminated: false,
+    }
 }
 
-/// Anchors in own-line `%%` comments; leading frontmatter is skipped.
-fn scan_mermaid(src: &str) -> Vec<Anchor> {
-    let mut anchors = Vec::new();
+/// Own-line `%%` comments; leading frontmatter is skipped.
+fn mermaid_comments(src: &str) -> Vec<Comment> {
+    let mut comments = Vec::new();
     let mut offset = 0;
     let mut frontmatter = starts_with_frontmatter(src);
     for (index, raw) in src.split_inclusive('\n').enumerate() {
@@ -187,13 +296,15 @@ fn scan_mermaid(src: &str) -> Vec<Anchor> {
         }
         let indent = line.len() - line.trim_start().len();
         if line[indent..].starts_with("%%") {
-            let body_start = start + indent + 2;
-            if let Some(anchor) = parse_body(src, body_start..start + line.len(), index + 1) {
-                anchors.push(anchor);
-            }
+            comments.push(Comment {
+                extent: start + indent..start + line.len(),
+                body: start + indent + 2..start + line.len(),
+                line: index + 1,
+                terminated: true,
+            });
         }
     }
-    anchors
+    comments
 }
 
 fn starts_with_frontmatter(src: &str) -> bool {
@@ -201,19 +312,9 @@ fn starts_with_frontmatter(src: &str) -> bool {
     lines.next() == Some("---") && lines.any(|l| l == "---")
 }
 
-/// Parses a comment body; `None` when it is not a dinyd anchor at all.
-fn parse_body(src: &str, body: Range<usize>, line: usize) -> Option<Anchor> {
-    let text = &src[body.clone()];
-    let lead = text.len() - text.trim_start().len();
-    let trimmed = &text[lead..];
-    let (kind, keyword) = if trimmed.starts_with("dinyd:") {
-        (Kind::Digest, "dinyd:")
-    } else if trimmed.starts_with("dinyd-ref:") {
-        (Kind::Ref, "dinyd-ref:")
-    } else {
-        return None;
-    };
-    let rest_start = body.start + lead + keyword.len();
+/// Parses the rest of a `dinyd:` or `dinyd-ref:` body, after its keyword.
+fn parse_reference(src: &str, kind: Kind, body: Range<usize>, line: usize) -> Anchor {
+    let rest_start = body.start;
     let rest = &src[rest_start..body.end];
     let rest_lead = rest.len() - rest.trim_start().len();
     let content_start = rest_start + rest_lead;
@@ -235,6 +336,7 @@ fn parse_body(src: &str, body: Range<usize>, line: usize) -> Option<Anchor> {
         let mode = match mode {
             "s1" => Some(Mode::S1),
             "b1" => Some(Mode::B1),
+            "d1" => Some(Mode::D1),
             _ => None,
         };
         let valid = value.len() == 16
@@ -254,7 +356,7 @@ fn parse_body(src: &str, body: Range<usize>, line: usize) -> Option<Anchor> {
     } else {
         parse_selector(&selector_text)
     };
-    Some(Anchor {
+    Anchor {
         kind,
         selector_text,
         selector,
@@ -263,13 +365,13 @@ fn parse_body(src: &str, body: Range<usize>, line: usize) -> Option<Anchor> {
         selector_span: content_start..selector_end,
         digest_span,
         terminated: true,
-    })
+    }
 }
 
 /// A trailing `mode:value` or bare 16-hex token: digest metadata, never part of the selector,
 /// so a malformed digest is not printed back as selector text.
 fn is_digest_token(token: &str) -> bool {
-    if token.starts_with("s1:") || token.starts_with("b1:") {
+    if ["s1:", "b1:", "d1:"].iter().any(|m| token.starts_with(m)) {
         return true;
     }
     let hex = |v: &str| !v.is_empty() && v.bytes().all(|b| b.is_ascii_hexdigit());

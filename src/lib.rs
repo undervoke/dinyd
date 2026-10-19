@@ -5,6 +5,7 @@ pub mod check;
 pub mod edit;
 pub mod git;
 pub mod target;
+pub mod unit;
 
 use std::fmt;
 

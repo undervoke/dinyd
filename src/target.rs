@@ -6,7 +6,7 @@ use sha2::{Digest as _, Sha256};
 use tree_sitter::{Language, Node, Parser, Tree};
 
 use crate::Error;
-use crate::anchor::{Mode, Selector};
+use crate::anchor::{DocKind, Mode, Selector};
 use crate::git::{Lookup, Snapshot};
 
 /// Why a selector does not resolve to exactly one valid target.
@@ -85,9 +85,12 @@ pub fn exists(snapshot: &Snapshot, selector: &Selector) -> Result<(), Failure> {
     match snapshot.lookup(&selector.path) {
         Lookup::Dir if selector.location.is_none() => Ok(()),
         Lookup::Dir => unresolved("a directory has no locations"),
-        Lookup::File => match &selector.location {
-            None => Ok(()),
-            Some(location) => {
+        Lookup::File => match (&selector.location, DocKind::of(&selector.path)) {
+            (None, _) => Ok(()),
+            (Some(name), Some(kind)) => {
+                unit(kind, &snapshot.read(&selector.path)?, name).map(|_| ())
+            }
+            (Some(location), None) => {
                 let source = snapshot.read(&selector.path)?;
                 regions(&selector.path, &source, location).map(|_| ())
             }
@@ -110,6 +113,16 @@ pub fn digest(
         Lookup::Missing => return unresolved("no such path"),
     }
     let source = snapshot.read(&selector.path)?;
+    if let (Some(name), Some(kind)) = (&selector.location, DocKind::of(&selector.path)) {
+        if mode.is_some_and(|m| m != Mode::D1) {
+            return unresolved("a document unit takes d1");
+        }
+        let content = unit(kind, &source, name)?;
+        return Ok((Mode::D1, hex(&Sha256::digest(crlf_to_lf(&content)))));
+    }
+    if mode == Some(Mode::D1) {
+        return unresolved("d1 is only for document units");
+    }
     let format = Format::of(&selector.path);
     let regions = match &selector.location {
         Some(location) => regions(&selector.path, &source, location)?,
@@ -129,12 +142,20 @@ pub fn digest(
     // A name(*) group is one region: its members' contents in source order.
     let mut hasher = Sha256::new();
     for region in &regions {
-        match mode {
-            Mode::S1 => hasher.update(&region.tokens),
-            Mode::B1 => hasher.update(crlf_to_lf(&source[region.range.clone()])),
+        if mode == Mode::S1 {
+            hasher.update(&region.tokens);
+        } else {
+            hasher.update(crlf_to_lf(&source[region.range.clone()]));
         }
     }
     Ok((mode, hex(&hasher.finalize())))
+}
+
+fn unit(kind: DocKind, source: &[u8], name: &str) -> Result<Vec<u8>, Failure> {
+    let Ok(text) = std::str::from_utf8(source) else {
+        return unresolved("not UTF-8");
+    };
+    crate::unit::content(kind, text, name).map_err(Failure::Unresolved)
 }
 
 fn hex(bytes: &[u8]) -> String {

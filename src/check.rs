@@ -116,6 +116,8 @@ pub fn judge(snapshot: &Snapshot, anchor: &Anchor) -> Result<(Verdict, Option<St
         return Ok((Verdict::Malformed, None));
     };
     let result = match anchor.kind {
+        // scan yields a declaration only when it is malformed, so it has no selector.
+        Kind::Declaration => return Ok((Verdict::Malformed, None)),
         Kind::Ref => target::exists(snapshot, selector).map(|_| Verdict::Ok),
         Kind::Digest => {
             let recorded = anchor.digest.as_ref();

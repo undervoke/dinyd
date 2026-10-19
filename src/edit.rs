@@ -21,6 +21,11 @@ pub fn apply(repo: &Repo, request: ApplyRequest) -> Result<(String, String), Err
     let (doc, kind, source) = read_doc(repo, request.doc)?;
     let selector = anchor::parse_selector(request.selector)
         .ok_or_else(|| Error::Usage(format!("malformed selector: {}", request.selector)))?;
+    if request.bytes && selector.location.is_some() && DocKind::of(&selector.path).is_some() {
+        return Err(Error::Usage(
+            "--bytes does not apply to a document unit; units use d1".to_string(),
+        ));
+    }
     let lines = LineIndex::new(&source);
     check_line(&source, &lines, request.line)?;
 

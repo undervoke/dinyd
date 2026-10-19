@@ -15,8 +15,8 @@ config:
 %% Behavior authority: this diagram and anchors.mermaid.
 %% Basis: --index (default · for gates) · --worktree (for checking while working) · --rev commit. Documents and targets are read from the same basis. --index and --rev read through the Git CLI (ls-files --stage -z · ls-tree -r -z --full-tree · cat-file --batch) and honor GIT_INDEX_FILE. --worktree reads the disk.
 %% Scope: all (default · for gates) · --changed [--base rev]. --changed selects only anchors in changed documents and anchors whose target path changed (deletions · renames included). Without --base it compares against HEAD; with --rev, --base is required. Malformed anchors are always included.
-%% Invalid: a malformed anchor (malformed); a target that is missing · matches two or more · is a disallowed entry (symlink · gitlink · intent-to-add under --index · unmerged under --index · --worktree) · fails to parse (unresolved). dinyd-ref also accepts a directory as its target.
-%% The digest is recomputed with the mode recorded in the anchor (s1 · b1).
+%% Invalid: a malformed anchor or unit declaration (malformed); a target that is missing · matches two or more · is a disallowed entry (symlink · gitlink · intent-to-add under --index · unmerged under --index · --worktree) · fails to parse · is a unit not paired exactly once (unresolved). dinyd-ref also accepts a directory as its target.
+%% The digest is recomputed with the mode recorded in the anchor (s1 · b1 · d1).
 %% Failure output is one line per anchor (document path → selector: verdict + next step), with no line numbers or document content. Usage and read errors exit 2 with a message on stderr.
 flowchart LR
   Collect["collect anchors<br/><small>• read documents · targets from the basis<br/>• all or --changed</small>"]

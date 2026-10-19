@@ -967,3 +967,249 @@ fn an_anchor_after_a_table_row_is_read() {
         [format!("doc.md → a.cs#A.F: {STALE}")]
     );
 }
+
+#[test]
+fn a_document_unit_tracks_only_its_wrapped_span() {
+    let repo = Repo::new();
+    let spec = "Alpha holds. <!-- dinyd-id: beta -->beta.<!-- /dinyd-id: beta --> Gamma holds.\n\nOther paragraph.\n";
+    repo.write("spec.md", spec);
+    repo.write("doc.md", "Beta is restated here.\n");
+    repo.git(&["add", "-A"]);
+    // SHA-256("beta.") starts with 49a242e6143002e5.
+    assert_eq!(
+        repo.apply("doc.md", 1, "spec.md#beta", &[]),
+        "dinyd: spec.md#beta d1:49a242e6143002e5"
+    );
+    let ok = repo.check(&["--worktree"]);
+    assert_eq!((ok.code, ok.stdout.as_str()), (0, ""));
+
+    repo.write(
+        "spec.md",
+        &spec
+            .replace("Gamma holds.", "Gamma holds!")
+            .replace("Other", "Another"),
+    );
+    assert_eq!(repo.check(&["--worktree"]).code, 0);
+
+    repo.write("spec.md", &spec.replace("beta.<", "beta!<"));
+    assert_eq!(
+        repo.check(&["--worktree"]).lines(),
+        [format!("doc.md → spec.md#beta: {STALE}")]
+    );
+    let run = repo.dinyd(&[
+        "update",
+        "doc.md",
+        "--line",
+        "1",
+        "--expect-selector",
+        "spec.md#beta",
+        "--worktree",
+    ]);
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert!(run.stdout.starts_with("d1:"), "{}", run.stdout);
+    assert_eq!(repo.check(&["--worktree"]).code, 0);
+}
+
+#[test]
+fn dinyd_comments_inside_a_unit_are_projected_out() {
+    let repo = Repo::new();
+    repo.write("src/a.cs", CLASS);
+    let spec = "<!-- dinyd-id: outer -->\nalpha <!-- dinyd-id: w -->beta<!-- /dinyd-id: w -->\n<!-- /dinyd-id: outer -->\n";
+    repo.write("spec.md", spec);
+    repo.write("doc.md", "Outer.\n\nInner.\n");
+    repo.git(&["add", "-A"]);
+    // Own-line boundaries drop their lines; inline markers are zero-width. SHA-256 of
+    // "alpha beta\n" starts with 87de0dca21b24293.
+    assert_eq!(
+        repo.apply("doc.md", 1, "spec.md#outer", &[]),
+        "dinyd: spec.md#outer d1:87de0dca21b24293"
+    );
+    repo.apply("doc.md", 3, "spec.md#w", &[]);
+    assert_eq!(repo.check(&["--worktree"]).code, 0);
+
+    // The target's own anchor, written by apply and later updated, never reaches the digest.
+    repo.apply("spec.md", 2, "src/a.cs#A.F", &["--worktree"]);
+    assert_eq!(repo.check(&["--worktree"]).code, 0);
+    repo.write(
+        "src/a.cs",
+        &CLASS.replace("void F() { }", "void F() { return; }"),
+    );
+    assert_eq!(
+        repo.check(&["--worktree"]).lines(),
+        [format!("spec.md → src/a.cs#A.F: {STALE}")]
+    );
+    let run = repo.dinyd(&[
+        "update",
+        "spec.md",
+        "--line",
+        "2",
+        "--expect-selector",
+        "src/a.cs#A.F",
+        "--worktree",
+    ]);
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert_eq!(repo.check(&["--worktree"]).code, 0);
+
+    // Removing the inner unit's markers leaves the outer unit's bytes as they were.
+    let unwrapped = repo
+        .read("spec.md")
+        .replace("<!-- dinyd-id: w -->", "")
+        .replace("<!-- /dinyd-id: w -->", "");
+    repo.write("spec.md", &unwrapped);
+    assert_eq!(
+        repo.check(&["--worktree"]).lines(),
+        [format!("doc.md → spec.md#w: {UNRESOLVED}")]
+    );
+
+    repo.write("spec.md", &unwrapped.replace("beta", "BETA"));
+    assert_eq!(
+        repo.check(&["--worktree"]).lines(),
+        [
+            format!("doc.md → spec.md#outer: {STALE}"),
+            format!("doc.md → spec.md#w: {UNRESOLVED}"),
+        ]
+    );
+}
+
+#[test]
+fn boundaries_are_own_line_or_inline_each_on_its_own() {
+    let repo = Repo::new();
+    repo.write(
+        "spec.md",
+        "- item\r\n  <!-- dinyd-id: own -->\r\nline one\r\n  <!-- /dinyd-id: own -->\r\n\r\npre <!-- dinyd-id: inline --> mid <!-- /dinyd-id: inline --> post\r\n",
+    );
+    repo.write("doc.md", "Own.\n\nInline.\n");
+    repo.git(&["add", "-A"]);
+    // SHA-256("line one\n") and SHA-256(" mid "): CRLF -> LF, no edge trim.
+    assert_eq!(
+        repo.apply("doc.md", 1, "spec.md#own", &[]),
+        "dinyd: spec.md#own d1:31f21b1dae81d3f3"
+    );
+    assert_eq!(
+        repo.apply("doc.md", 3, "spec.md#inline", &[]),
+        "dinyd: spec.md#inline d1:b83fac3baf0d0a46"
+    );
+}
+
+#[test]
+fn pairing_errors_are_unresolved_on_each_referer() {
+    let repo = Repo::new();
+    repo.write(
+        "spec.md",
+        "<!-- dinyd-id: lone -->a\n\n<!-- /dinyd-id: back -->b<!-- dinyd-id: back -->\n\n<!-- dinyd-id: dup -->c<!-- /dinyd-id: dup --><!-- dinyd-id: dup -->\n\n<!-- dinyd-id: fine -->d<!-- /dinyd-id: fine -->\n\n<!-- dinyd-id: orphan -->e\n\n```\n<!-- dinyd-id: code -->f<!-- /dinyd-id: code -->\n```\n",
+    );
+    repo.write(
+        "doc.md",
+        "L <!-- dinyd: spec.md#lone -->\n\nB <!-- dinyd: spec.md#back -->\n\nD <!-- dinyd-ref: spec.md#dup -->\n\nM <!-- dinyd: spec.md#missing -->\n\nC <!-- dinyd-ref: spec.md#code -->\n\nF <!-- dinyd-ref: spec.md#fine -->\n",
+    );
+    repo.git(&["add", "-A"]);
+    let run = repo.check(&[]);
+    assert_eq!(
+        run.lines(),
+        [
+            format!("doc.md → spec.md#lone: {UNRESOLVED}"),
+            format!("doc.md → spec.md#back: {UNRESOLVED}"),
+            format!("doc.md → spec.md#dup: {UNRESOLVED}"),
+            format!("doc.md → spec.md#missing: {UNRESOLVED}"),
+            format!("doc.md → spec.md#code: {UNRESOLVED}"),
+        ]
+    );
+    for reason in [
+        "unit lone has no end",
+        "unit back ends before it starts",
+        "unit dup is declared more than once",
+        "no unit missing",
+        "no unit code",
+    ] {
+        assert!(run.stderr.contains(reason), "{reason}: {}", run.stderr);
+    }
+
+    let before = repo.read("doc.md");
+    let refused = repo.dinyd(&[
+        "apply",
+        "doc.md",
+        "--line",
+        "1",
+        "--selector",
+        "spec.md#lone",
+    ]);
+    assert_eq!(refused.code, 1);
+    assert!(
+        refused.stderr.contains("unit lone has no end"),
+        "{}",
+        refused.stderr
+    );
+    assert_eq!(repo.read("doc.md"), before);
+}
+
+#[test]
+fn a_declaration_that_does_not_parse_is_malformed() {
+    let repo = Repo::new();
+    repo.write(
+        "spec.md",
+        "A <!-- dinyd-id: bad name -->a<!-- /dinyd-id: -->\n\nB <!-- dinyd-id: good -->b<!-- /dinyd-id: good -->\n",
+    );
+    repo.git(&["add", "-A"]);
+    assert_eq!(
+        repo.check(&[]).lines(),
+        [
+            format!("spec.md → dinyd-id: bad name: {MALFORMED}"),
+            format!("spec.md → /dinyd-id:: {MALFORMED}"),
+        ]
+    );
+}
+
+#[test]
+fn a_unit_takes_only_d1() {
+    let repo = Repo::new();
+    repo.write("spec.md", "<!-- dinyd-id: u -->u<!-- /dinyd-id: u -->\n");
+    repo.write("cfg.json", "{\"a\":1}\n");
+    repo.write(
+        "doc.md",
+        "Claim.\n\nS <!-- dinyd: spec.md#u s1:0123456789abcdef -->\n\nJ <!-- dinyd: cfg.json#/a d1:0123456789abcdef -->\n",
+    );
+    repo.git(&["add", "-A"]);
+    let before = repo.read("doc.md");
+    let run = repo.dinyd(&[
+        "apply",
+        "doc.md",
+        "--line",
+        "1",
+        "--selector",
+        "spec.md#u",
+        "--bytes",
+    ]);
+    assert_eq!(run.code, 2, "{}", run.stderr);
+    assert_eq!(repo.read("doc.md"), before);
+
+    assert_eq!(
+        repo.check(&[]).lines(),
+        [
+            format!("doc.md → spec.md#u: {UNRESOLVED}"),
+            format!("doc.md → cfg.json#/a: {UNRESOLVED}"),
+        ]
+    );
+    let whole = repo.apply("doc.md", 1, "spec.md", &[]);
+    assert!(whole.contains(" b1:"), "{whole}");
+}
+
+#[test]
+fn a_mermaid_unit_is_the_lines_between_its_markers() {
+    let repo = Repo::new();
+    let diagram = "flowchart LR\n  %% dinyd-id: edge\n  A --> B\n  %% /dinyd-id: edge\n  B --> C\n";
+    repo.write("d.mermaid", diagram);
+    repo.write("doc.md", "A leads to B.\n");
+    repo.git(&["add", "-A"]);
+    // SHA-256("  A --> B\n") starts with be52d6887f5770ba.
+    assert_eq!(
+        repo.apply("doc.md", 1, "d.mermaid#edge", &[]),
+        "dinyd: d.mermaid#edge d1:be52d6887f5770ba"
+    );
+    repo.write("d.mermaid", &diagram.replace("B --> C", "B --> D"));
+    assert_eq!(repo.check(&["--worktree"]).code, 0);
+    repo.write("d.mermaid", &diagram.replace("A --> B", "A --> X"));
+    assert_eq!(
+        repo.check(&["--worktree"]).lines(),
+        [format!("doc.md → d.mermaid#edge: {STALE}")]
+    );
+}

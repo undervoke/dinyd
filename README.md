@@ -59,6 +59,27 @@ Documents are tracked `*.md` and `*.mermaid` files. In Markdown an anchor is
 an HTML comment anywhere outside code blocks and inline code. In `.mermaid` it
 is an own-line `%%` comment, after any leading frontmatter.
 
+### Document units
+
+A document can be the target too. To reference part of one, wrap that part
+in the target document with a start and an end that repeat one name:
+
+```md
+Tokens expire after an hour. <!-- dinyd-id: refresh -->Refresh rotates the token.<!-- /dinyd-id: refresh --> Logout revokes it.
+```
+
+```
+%% dinyd-id: edge
+  A --> B
+%% /dinyd-id: edge
+```
+
+The unit is the bytes between the two. A boundary alone on its line drops
+that whole line; an inline boundary stops at the comment itself. Units may
+nest or overlap. A name is ASCII letters, digits, `_`, `.`, and `-`, and must
+be declared exactly once per document; declarations follow the same code and
+frontmatter rules as anchors.
+
 ### Selectors
 
 `path#location`. The path is the Git path from the repository root, with `/`
@@ -70,6 +91,7 @@ as the only separator. Without `#location` the selector is the whole file.
 | Vue | Symbol path inside a top-level `<script>` or `<script setup>` |
 | JSON, YAML | JSON Pointer: `/scripts/build`, `/jobs/test/steps/0` |
 | CSS | A rule's selector: `.card > .title` |
+| Markdown, `.mermaid` | A unit's name: `docs/auth.md#refresh` |
 
 C# namespaces are not part of the path; TypeScript namespaces and modules
 are. Members that share a name (overloads) are ambiguous; `Verify(*)` takes
@@ -81,7 +103,13 @@ all of them, in source order, as one region.
   tokens is ignored; comments count, and text inside strings and comments
   is kept exactly. The default for the code and data formats above.
 - `b1` (bytes): the exact bytes with CRLF turned into LF. The default for
-  other files and whole `.vue` files; `apply --bytes` chooses it anywhere.
+  other files and whole `.vue` files; `apply --bytes` chooses it anywhere
+  but a document unit.
+- `d1` (document unit): the unit's bytes with CRLF turned into LF and dinyd
+  comments taken out — a comment alone on its line with that line, a
+  declaration by itself, an anchor with the one space before it. So adding,
+  removing, or updating anchors and inner units never changes it, while any
+  other edit inside the unit does. The only mode for document units.
 
 A digest is the first 16 hex digits of SHA-256, and check recomputes it with
 the mode recorded in the anchor.
@@ -104,8 +132,8 @@ docs/auth.md → src/Hasher.cs#PasswordHasher.Verify: stale — re-judge the cla
 |---|---|---|
 | `stale` | The target changed since the digest | Re-judge the claim, then `update` |
 | `undeclared` | A hand-written digest anchor without a digest | `update` fills it |
-| `unresolved` | The target is missing, ambiguous, of a disallowed kind (such as a symlink), or cannot be parsed | Re-judge the claim and the reference |
-| `malformed` | The anchor itself is broken | Re-judge the claim and the reference |
+| `unresolved` | The target is missing, ambiguous, of a disallowed kind (such as a symlink), or cannot be parsed; a unit is not declared exactly once or its end comes first | Re-judge the claim and the reference |
+| `malformed` | The anchor or unit declaration itself is broken | Re-judge the claim and the reference |
 
 Output never carries line numbers, digests, or document text; the reason a
 target did not resolve goes to stderr.
