@@ -76,7 +76,8 @@ export default {
       try {
         const session = await ctx.session.get({ sessionID: event.sessionID });
         if (typeof session?.location?.directory === "string") {
-          worktree = path.resolve(session.location.directory, session.subpath || "");
+          // subpath is project-relative metadata; directory is already the session path.
+          worktree = session.location.directory;
         }
       } catch {}
       const reason = judge(tool, (event && (event.input || event.args)) || {}, worktree);

@@ -67,6 +67,32 @@ impl Repo {
 
 const LOCK: &str = "<!-- dinyd-lock -->\nprotected\n<!-- /dinyd-lock -->\n";
 
+// Appending v2's project-relative subpath inspected the wrong file or rejected valid edits.
+// Retire when the OpenCode v2 adapter no longer resolves session directories.
+#[test]
+fn opencode_v2_uses_the_absolute_session_directory() {
+    let repo = Repo::new("unlocked plugin load location\n");
+    let binary_dir = Path::new(env!("CARGO_BIN_EXE_dinyd")).parent().unwrap();
+    let mut paths = vec![binary_dir.to_path_buf()];
+    paths.extend(std::env::split_paths(&std::env::var_os("PATH").unwrap()));
+    let output = Command::new("node")
+        .arg(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/opencode-v2.mjs"
+        ))
+        .arg(repo.path())
+        .env("PATH", std::env::join_paths(paths).unwrap())
+        .current_dir(repo.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
 // Dropping a native patch field silently allowed edits; retire with patch-tool support.
 #[test]
 fn native_patch_payloads_reach_the_guard() {
