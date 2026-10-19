@@ -55,10 +55,8 @@ The release rules are owned by the workflow. <!-- dinyd-ref: .github/workflows/r
 - `dinyd-ref:` is a **delegation**: the claim only points at the target, so
   dinyd checks that it exists. It may name a directory.
 
-Documents are tracked Markdown (`*.md`) and Mermaid (`*.mermaid`, `*.mmd`)
-files. In Markdown an anchor is an HTML comment anywhere outside code blocks
-and inline code. In Mermaid it is an own-line `%%` comment, after any leading
-frontmatter.
+Documents are tracked Markdown files (and [Mermaid](#mermaid) files). An
+anchor is an HTML comment anywhere outside code blocks and inline code.
 
 ### Document units
 
@@ -69,17 +67,11 @@ in the target document with a start and an end that repeat one name:
 Tokens expire after an hour. <!-- dinyd-id: refresh -->Refresh rotates the token.<!-- /dinyd-id: refresh --> Logout revokes it.
 ```
 
-```
-%% dinyd-id: edge
-  A --> B
-%% /dinyd-id: edge
-```
-
 The unit is the bytes between the two. A boundary alone on its line drops
 that whole line; an inline boundary stops at the comment itself. Units may
 nest or overlap. A name is ASCII letters, digits, `_`, `.`, and `-`, and must
-be declared exactly once per document; declarations follow the same code and
-frontmatter rules as anchors.
+be declared exactly once per document; declarations follow the same rules as
+anchors.
 
 ### Links
 
@@ -91,7 +83,7 @@ document, with no anchor written next to it.
 ```md
 Read [Checks](verification/checks.md), then the [migrations](../../db/migrations/).
 
-@import "checks.mermaid"
+@import "checks.csv"
 ```
 
 - A link destination is relative to the document's directory, as the
@@ -106,8 +98,7 @@ Read [Checks](verification/checks.md), then the [migrations](../../db/migrations
   that should not be checked, write it as inline code.
 
 `dinyd-ref` remains for what a link cannot carry: a location such as a
-symbol or a unit, a path mentioned in prose or inline code, and references
-in Mermaid documents.
+symbol or a unit, or a path mentioned in prose or inline code.
 
 ### Selectors
 
@@ -120,7 +111,7 @@ as the only separator. Without `#location` the selector is the whole file.
 | Vue | Symbol path inside a top-level `<script>` or `<script setup>` |
 | JSON, YAML | JSON Pointer: `/scripts/build`, `/jobs/test/steps/0` |
 | CSS | A rule's selector: `.card > .title` |
-| Markdown, Mermaid | A unit's name: `docs/auth.md#refresh` |
+| Document | A unit's name: `docs/auth.md#refresh` |
 
 C# namespaces are not part of the path; TypeScript namespaces and modules
 are. Members that share a name (overloads) are ambiguous; `Verify(*)` takes
@@ -143,6 +134,12 @@ all of them, in source order, as one region.
 A digest is the first 16 hex digits of SHA-256, and check recomputes it with
 the mode recorded in the anchor.
 
+### Mermaid
+
+`*.mermaid` and `*.mmd` files are documents too. In them an anchor or a unit
+boundary is an own-line `%%` comment after any leading frontmatter, apply
+writes the anchor on a new line after line `n`, and links are not checked.
+
 ## Commands
 
 ### check
@@ -151,7 +148,8 @@ the mode recorded in the anchor.
 dinyd check [--index | --worktree | --rev <commit>] [--changed [--base <rev>]]
 ```
 
-Judges every anchor and prints one line per failure; exit 1 if any fail.
+Judges every anchor and local link destination and prints one line per
+failure; exit 1 if any fail.
 
 ```
 docs/auth.md → src/Hasher.cs#PasswordHasher.Verify: stale — re-judge the claim, then update
@@ -188,12 +186,11 @@ target did not resolve goes to stderr.
 dinyd apply <doc> --line <n> --selector <selector> [--bytes | --ref] [--index | --worktree | --rev <commit>]
 ```
 
-Writes one anchor with its mode and first digest: at the end of line `n` in
-Markdown, on a new `%%` line after line `n` in Mermaid. It prints the
-anchor and names the view the target was read from. It refuses, writing
-nothing, when the target does not resolve, the same anchor is already there,
-or check's parser would not read the written anchor, as inside a code block
-or Mermaid frontmatter.
+Writes one anchor with its mode and first digest at the end of line `n`. It
+prints the anchor and names the view the target was read from. It refuses,
+writing nothing, when the target does not resolve, the same anchor is already
+there, or check's parser would not read the written anchor, as inside a code
+block.
 
 ### update
 
@@ -214,7 +211,7 @@ judging with `--index`.
 
 | Code | Meaning |
 |---|---|
-| 0 | check: every anchor is ok; apply, update: written or unchanged |
+| 0 | check: every checked reference is ok; apply, update: written or unchanged |
 | 1 | check: at least one failure; apply, update: refused, nothing written |
 | 2 | Usage or read error |
 
