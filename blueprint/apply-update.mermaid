@@ -1,5 +1,5 @@
 ---
-title: dinyd · 관계 만들기와 갱신
+title: dinyd · creating and updating relationships
 config:
   look: classic
   theme: dark
@@ -21,37 +21,37 @@ config:
     width: 200
     wrap: true
 ---
-%% Behavior authority: 이 다이어그램과 anchors.mermaid.
-%% apply <doc> --line N --selector S [--bytes] [--ref] [--index | --worktree | --rev commit]: 관계 하나를 만들고 방식과 첫 digest를 쓴다. md는 N번째 줄 끝에 inline HTML 주석을 붙이고, .mermaid는 N 다음 줄에 %% 줄을 넣는다.
-%% apply는 쓴 위치에서 check와 같은 parser가 그 anchor를 찾지 못하거나, 쓸 위치(md는 N, .mermaid는 N 다음 줄)에 S의 anchor가 이미 있으면 거부한다. --ref는 digest 없는 dinyd-ref를 쓰고 --bytes와 함께 쓸 수 없다.
-%% --bytes가 없으면 형식별 기본 방식(구조 정규화가 있으면 s1, 없으면 b1)을 쓴다.
-%% update <doc> --line N --expect-selector S [--index | --worktree | --rev commit]: 기록된 방식으로 digest를 다시 계산해 쓴다. 손으로 쓴 digest 없는 anchor도 형식별 기본 방식으로 채운다. 방식을 바꾸려면 표기를 손으로 고치고 update한다.
-%% N은 1부터 세는 줄 번호이고 LF만 센다. update는 check와 같은 parser로 anchor를 찾고, selector는 working tree 문서의 현재 anchor에서 읽는다. 대상 내용은 고른 판정 기준에서 읽는다.
-%% update는 N번째 줄에 S와 맞는 digest anchor가 하나이고 대상이 해석될 때만 쓴다. 위임 참조는 update 대상이 아니다.
-%% apply · update는 쓸 수 없으면 쓰지 않고 오류를 내며, apply는 사용한 판정 기준을 함께 알린다. 쓴 뒤 --index로 판정하려면 문서를 stage해야 한다.
-%% 쓰기는 anchor 자리만 바꾸고 나머지 바이트와 CRLF를 보존한다. 일괄 갱신은 없다. 계산한 digest가 같으면 변화가 없다.
+%% Behavior authority: this diagram and anchors.mermaid.
+%% apply <doc> --line N --selector S [--bytes] [--ref] [--index | --worktree | --rev commit]: creates one relationship and writes its mode and first digest. In md it appends an inline HTML comment to the end of line N; in .mermaid it inserts a %% line after line N.
+%% apply refuses when check's parser would not find the anchor at the written position, or when an anchor for S is already at the write position (line N in md, the line after N in .mermaid). --ref writes a dinyd-ref without a digest and cannot be combined with --bytes.
+%% Without --bytes it uses the format's default mode (s1 when structural normalization exists, otherwise b1).
+%% update <doc> --line N --expect-selector S [--index | --worktree | --rev commit]: recomputes the digest with the recorded mode and writes it. A hand-written anchor without a digest is filled with the format's default mode. To change the mode, edit it in the anchor by hand and run update.
+%% N is a 1-based line number counting LF only. update finds the anchor with check's parser and reads the selector from the current anchor in the working-tree document. The target content is read from the chosen basis.
+%% update writes only when line N holds exactly one digest anchor matching S and the target resolves. Delegations are not update targets.
+%% When apply · update cannot write, they write nothing and report an error; apply also names the basis it used. To judge with --index after writing, stage the document.
+%% Writing changes only the anchor's slot and preserves every other byte and CRLF. There is no bulk update. If the computed digest is the same, nothing changes.
 sequenceDiagram
   autonumber
-  actor Worker as 작업자<br/>사람 · agent
-  participant Doc@{ "type": "collections", "alias": "문서" }
+  actor Worker as worker<br/>person · agent
+  participant Doc@{ "type": "collections", "alias": "document" }
   participant Dinyd as dinyd
 
-  Note over Worker,Dinyd: 관계 만들기
-  Worker->>Doc: 문서를 열어 claim과 근거를 판단
+  Note over Worker,Dinyd: creating a relationship
+  Worker->>Doc: open the document and judge the claim and its evidence
   Worker->>Dinyd: apply B.md --line N --selector A.cs#35;Foo
-  Dinyd->>Doc: anchor와 첫 digest 쓰기
+  Dinyd->>Doc: write the anchor and first digest
 
-  Note over Worker,Dinyd: 근거 코드가 바뀜
+  Note over Worker,Dinyd: the evidence code changes
   Worker->>Dinyd: check
-  Dinyd-->>Worker: B.md → A.cs#35;Foo: stale<br/>줄 번호 · 문서 내용 없음
+  Dinyd-->>Worker: B.md → A.cs#35;Foo: stale<br/>no line number · no document content
 
   rect rgb(23, 61, 37)
-    Note over Worker,Doc: em · dinyd가 유도하는 구간
-    Worker->>Doc: 문서를 열어 anchor를 찾고 claim을 다시 판단
-    opt claim이 틀림
-      Worker->>Doc: claim 수정
+    Note over Worker,Doc: em · the span dinyd induces
+    Worker->>Doc: open the document, find the anchor, and re-judge the claim
+    opt the claim is wrong
+      Worker->>Doc: fix the claim
     end
   end
 
   Worker->>Dinyd: update B.md --line N --expect-selector A.cs#35;Foo
-  Dinyd->>Doc: digest만 다시 쓰기
+  Dinyd->>Doc: rewrite only the digest

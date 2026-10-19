@@ -1,5 +1,5 @@
 ---
-title: dinyd · check 판정
+title: dinyd · check verdicts
 config:
   look: handDrawn
   handDrawnSeed: 5
@@ -12,31 +12,31 @@ config:
   flowchart:
     wrappingWidth: 300
 ---
-%% Behavior authority: 이 다이어그램과 anchors.mermaid.
-%% 판정 기준: --index(기본 · gate용) · --worktree(작업 중 확인용) · --rev commit. 문서와 대상은 같은 판정 기준에서 읽는다. --index와 --rev는 Git CLI(ls-files --stage -z · ls-tree -r -z --full-tree · cat-file --batch)로 읽고 GIT_INDEX_FILE을 따른다. --worktree는 디스크 내용을 읽는다.
-%% 검사 범위: 전체(기본 · gate용) · --changed [--base rev]. --changed는 바뀐 문서의 anchor와 대상 경로가 바뀐 anchor(삭제 · rename 포함)만 고른다. --base가 없으면 HEAD 대비이고, --rev와 함께 쓰면 --base가 필요하다. 형식이 깨진 anchor는 항상 포함한다.
-%% 유효하지 않음: 형식 오류(malformed), 대상 없음 · 2개 이상 · 허용되지 않는 항목(symlink · gitlink · --index의 intent-to-add · --index · --worktree의 unmerged) · 파싱 실패(unresolved). dinyd-ref는 디렉터리도 대상으로 허용한다.
-%% digest는 anchor에 기록된 방식(s1 · b1)으로 다시 계산한다.
-%% 실패 출력은 anchor마다 한 줄(문서 경로 → selector: 결과 + 다음 할 일)이고 줄 번호 · 문서 내용은 없다. 사용법 · 읽기 오류는 exit 2와 stderr다.
+%% Behavior authority: this diagram and anchors.mermaid.
+%% Basis: --index (default · for gates) · --worktree (for checking while working) · --rev commit. Documents and targets are read from the same basis. --index and --rev read through the Git CLI (ls-files --stage -z · ls-tree -r -z --full-tree · cat-file --batch) and honor GIT_INDEX_FILE. --worktree reads the disk.
+%% Scope: all (default · for gates) · --changed [--base rev]. --changed selects only anchors in changed documents and anchors whose target path changed (deletions · renames included). Without --base it compares against HEAD; with --rev, --base is required. Malformed anchors are always included.
+%% Invalid: a malformed anchor (malformed); a target that is missing · matches two or more · is a disallowed entry (symlink · gitlink · intent-to-add under --index · unmerged under --index · --worktree) · fails to parse (unresolved). dinyd-ref also accepts a directory as its target.
+%% The digest is recomputed with the mode recorded in the anchor (s1 · b1).
+%% Failure output is one line per anchor (document path → selector: verdict + next step), with no line numbers or document content. Usage and read errors exit 2 with a message on stderr.
 flowchart LR
-  Collect["anchor 모으기<br/><small>• 판정 기준에서 문서 · 대상 읽기<br/>• 전체 또는 --changed</small>"]
-  Found{"참조와 대상이 유효한가"}
+  Collect["collect anchors<br/><small>• read documents · targets from the basis<br/>• all or --changed</small>"]
+  Found{"are the reference and target valid?"}
   Digest{"digest"}
   Ok["ok"]
 
-  subgraph Fail["exit 1 · 문서를 열어야 함"]
-    Broken["malformed · unresolved<br/><small>claim과 참조를 다시 판단</small>"]
-    Undeclared["undeclared<br/><small>update로 digest를 채운다</small>"]
-    Stale["stale<br/><small>claim을 다시 판단하고 update</small>"]
+  subgraph Fail["exit 1 · the document must be opened"]
+    Broken["malformed · unresolved<br/><small>re-judge the claim and the reference</small>"]
+    Undeclared["undeclared<br/><small>fill the digest with update</small>"]
+    Stale["stale<br/><small>re-judge the claim, then update</small>"]
   end
 
   Collect --> Found
-  Found -->|아니오| Broken
-  Found -->|예 · dinyd-ref| Ok
-  Found -->|예 · dinyd| Digest
-  Digest -->|없음| Undeclared
-  Digest -->|다름| Stale
-  Digest -->|같음| Ok
+  Found -->|no| Broken
+  Found -->|yes · dinyd-ref| Ok
+  Found -->|yes · dinyd| Digest
+  Digest -->|none| Undeclared
+  Digest -->|differs| Stale
+  Digest -->|equal| Ok
 
   classDef em fill:#173d25,stroke:#86efac
   class Fail em
