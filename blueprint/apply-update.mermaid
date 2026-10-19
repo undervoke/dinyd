@@ -22,8 +22,8 @@ config:
     wrap: true
 ---
 %% Behavior authority: this diagram and anchors.mermaid.
-%% apply <doc> --line N --selector S [--bytes] [--ref] [--index | --worktree | --rev commit]: creates one relationship and writes its mode and first digest. In md it appends an inline HTML comment to the end of line N; in .mermaid it inserts a %% line after line N.
-%% apply refuses when check's parser would not find the anchor at the written position, or when an anchor for S is already at the write position (line N in md, the line after N in .mermaid). --ref writes a dinyd-ref without a digest and cannot be combined with --bytes.
+%% apply <doc> --line N --selector S [--bytes] [--ref] [--index | --worktree | --rev commit]: creates one relationship and writes its mode and first digest. In md it appends an inline HTML comment to the end of line N; in Mermaid it inserts a %% line after line N.
+%% apply refuses when check's parser would not find the anchor at the written position, or when an anchor for S is already at the write position (line N in md, the line after N in Mermaid). --ref writes a dinyd-ref without a digest and cannot be combined with --bytes.
 %% Without --bytes it uses the format's default mode (s1 when structural normalization exists, otherwise b1); a document unit always takes d1, and --bytes with a unit selector is a usage error.
 %% update <doc> --line N --expect-selector S [--index | --worktree | --rev commit]: recomputes the digest with the recorded mode and writes it. A hand-written anchor without a digest is filled with the format's default mode. To change the mode, edit it in the anchor by hand and run update.
 %% N is a 1-based line number counting LF only. update finds the anchor with check's parser and reads the selector from the current anchor in the working-tree document. The target content is read from the chosen basis.

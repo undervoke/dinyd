@@ -182,7 +182,7 @@ impl<'r> Snapshot<'r> {
         &self.basis
     }
 
-    /// Tracked `*.md` and `*.mermaid` documents readable from this basis.
+    /// Tracked `*.md`, `*.mermaid`, and `*.mmd` documents readable from this basis.
     pub fn documents(&self) -> Vec<String> {
         self.entries
             .iter()

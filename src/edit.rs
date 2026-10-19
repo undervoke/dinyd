@@ -189,7 +189,7 @@ pub fn update(repo: &Repo, request: UpdateRequest) -> Result<Updated, Error> {
 fn read_doc(repo: &Repo, given: &Path) -> Result<(String, DocKind, String), Error> {
     let doc = repo.relative(given)?;
     let kind = DocKind::of(&doc)
-        .ok_or_else(|| Error::Usage(format!("{doc}: documents are *.md or *.mermaid")))?;
+        .ok_or_else(|| Error::Usage(format!("{doc}: documents are *.md, *.mermaid, or *.mmd")))?;
     let bytes =
         std::fs::read(repo.disk_path(&doc)).map_err(|e| Error::Read(format!("{doc}: {e}")))?;
     let source = String::from_utf8(bytes).map_err(|_| Error::Read(format!("{doc}: not UTF-8")))?;

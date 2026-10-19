@@ -55,9 +55,10 @@ The release rules are owned by the workflow. <!-- dinyd-ref: .github/workflows/r
 - `dinyd-ref:` is a **delegation**: the claim only points at the target, so
   dinyd checks that it exists. It may name a directory.
 
-Documents are tracked `*.md` and `*.mermaid` files. In Markdown an anchor is
-an HTML comment anywhere outside code blocks and inline code. In `.mermaid` it
-is an own-line `%%` comment, after any leading frontmatter.
+Documents are tracked Markdown (`*.md`) and Mermaid (`*.mermaid`, `*.mmd`)
+files. In Markdown an anchor is an HTML comment anywhere outside code blocks
+and inline code. In Mermaid it is an own-line `%%` comment, after any leading
+frontmatter.
 
 ### Document units
 
@@ -106,7 +107,7 @@ Read [Checks](verification/checks.md), then the [migrations](../../db/migrations
 
 `dinyd-ref` remains for what a link cannot carry: a location such as a
 symbol or a unit, a path mentioned in prose or inline code, and references
-in `.mermaid` documents.
+in Mermaid documents.
 
 ### Selectors
 
@@ -119,7 +120,7 @@ as the only separator. Without `#location` the selector is the whole file.
 | Vue | Symbol path inside a top-level `<script>` or `<script setup>` |
 | JSON, YAML | JSON Pointer: `/scripts/build`, `/jobs/test/steps/0` |
 | CSS | A rule's selector: `.card > .title` |
-| Markdown, `.mermaid` | A unit's name: `docs/auth.md#refresh` |
+| Markdown, Mermaid | A unit's name: `docs/auth.md#refresh` |
 
 C# namespaces are not part of the path; TypeScript namespaces and modules
 are. Members that share a name (overloads) are ambiguous; `Verify(*)` takes
@@ -188,11 +189,11 @@ dinyd apply <doc> --line <n> --selector <selector> [--bytes | --ref] [--index | 
 ```
 
 Writes one anchor with its mode and first digest: at the end of line `n` in
-Markdown, on a new `%%` line after line `n` in `.mermaid`. It prints the
+Markdown, on a new `%%` line after line `n` in Mermaid. It prints the
 anchor and names the view the target was read from. It refuses, writing
 nothing, when the target does not resolve, the same anchor is already there,
 or check's parser would not read the written anchor, as inside a code block
-or `.mermaid` frontmatter.
+or Mermaid frontmatter.
 
 ### update
 

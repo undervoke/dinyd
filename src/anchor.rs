@@ -1,4 +1,4 @@
-//! Anchors inline in documents: grammar plus the md and .mermaid scanners.
+//! Anchors inline in documents: grammar plus the md and Mermaid scanners.
 
 use std::ops::Range;
 
@@ -86,7 +86,7 @@ impl DocKind {
     pub fn of(path: &str) -> Option<DocKind> {
         if path.ends_with(".md") {
             Some(DocKind::Markdown)
-        } else if path.ends_with(".mermaid") {
+        } else if path.ends_with(".mermaid") || path.ends_with(".mmd") {
             Some(DocKind::Mermaid)
         } else {
             None

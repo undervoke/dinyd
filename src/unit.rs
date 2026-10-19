@@ -1,4 +1,4 @@
-//! Document units: the span of a .md or .mermaid document between `dinyd-id: NAME` and
+//! Document units: the span of a Markdown or Mermaid document between `dinyd-id: NAME` and
 //! `/dinyd-id: NAME`, with dinyd comments projected out.
 
 use std::ops::Range;

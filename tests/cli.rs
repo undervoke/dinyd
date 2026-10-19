@@ -1212,6 +1212,14 @@ fn a_mermaid_unit_is_the_lines_between_its_markers() {
         repo.check(&["--worktree"]).lines(),
         [format!("doc.md → d.mermaid#edge: {STALE}")]
     );
+
+    repo.write("d.mmd", diagram);
+    repo.git(&["add", "-A"]);
+    assert_eq!(
+        repo.apply("doc.md", 1, "d.mmd#edge", &[]),
+        "dinyd: d.mmd#edge d1:be52d6887f5770ba",
+        "a .mmd file is a Mermaid document"
+    );
 }
 
 #[test]
