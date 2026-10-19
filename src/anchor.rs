@@ -110,13 +110,19 @@ pub enum Keyword {
     Ref,
     Start,
     End,
+    /// `dinyd-lock` — a lock boundary opening a protected span.
+    LockStart,
+    /// `/dinyd-lock` — a lock boundary closing a protected span.
+    LockEnd,
 }
 
-const KEYWORDS: [(&str, Keyword); 4] = [
+const KEYWORDS: [(&str, Keyword); 6] = [
     ("dinyd:", Keyword::Digest),
     ("dinyd-ref:", Keyword::Ref),
     ("dinyd-id:", Keyword::Start),
     ("/dinyd-id:", Keyword::End),
+    ("dinyd-lock", Keyword::LockStart),
+    ("/dinyd-lock", Keyword::LockEnd),
 ];
 
 impl Comment {
@@ -142,12 +148,28 @@ impl Comment {
         (self.terminated && is_name(name)).then_some((end, name))
     }
 
+    /// A lock boundary and whether it is well-formed: exactly `dinyd-lock` or `/dinyd-lock`
+    /// after trimming, with its terminator intact. Extra text or a lost terminator counts as
+    /// a recognized but malformed marker, so the guard denies rather than misreads it.
+    pub fn lock_marker(&self, src: &str) -> Option<(bool, bool)> {
+        let (keyword, rest) = self.keyword(src)?;
+        let end = match keyword {
+            Keyword::LockStart => false,
+            Keyword::LockEnd => true,
+            _ => return None,
+        };
+        let wellformed = self.terminated && src[rest..self.body.end].trim().is_empty();
+        Some((end, wellformed))
+    }
+
     /// The anchor this comment holds; a malformed declaration counts as one so check reports it.
     fn anchor(&self, src: &str) -> Option<Anchor> {
         let (keyword, rest) = self.keyword(src)?;
         let mut anchor = match keyword {
             Keyword::Digest => parse_reference(src, Kind::Digest, rest..self.body.end, self.line),
             Keyword::Ref => parse_reference(src, Kind::Ref, rest..self.body.end, self.line),
+            // Lock markers are protection metadata, never evidence references.
+            Keyword::LockStart | Keyword::LockEnd => return None,
             Keyword::Start | Keyword::End => {
                 if self.declaration(src).is_some() {
                     return None;

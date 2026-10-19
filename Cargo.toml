@@ -1,6 +1,6 @@
 [package]
 name = "dinyd"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.93.0"
 license = "MIT OR Apache-2.0"
@@ -10,8 +10,13 @@ repository = "https://github.com/undervoke/dinyd"
 [dependencies]
 clap = { version = "4.6", features = ["derive"] }
 pulldown-cmark = { version = "0.13", default-features = false }
-serde_json = "1"
+serde_json = { version = "1", features = ["preserve_order"] }
 sha2 = "0.10"
+ureq = { version = "3", default-features = false, features = ["rustls"] }
+semver = "1"
+dirs = "7"
+tempfile = "3"
+self-replace = "1"
 tree-sitter = "0.27"
 tree-sitter-c-sharp = "0.23"
 tree-sitter-css = "0.25"
@@ -21,8 +26,12 @@ tree-sitter-json = "0.24"
 tree-sitter-typescript = "0.23"
 tree-sitter-yaml = "0.7"
 
-[dev-dependencies]
-tempfile = "3"
+[target.'cfg(unix)'.dependencies]
+tar = "0.4"
+xz2 = { version = "0.1", features = ["static"] }
+
+[target.'cfg(windows)'.dependencies]
+zip = { version = "9", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 # The profile that 'dist' will build with
 [profile.dist]

@@ -1,0 +1,37 @@
+---
+title: dinyd · project runtime and host bindings
+config:
+  look: handDrawn
+  handDrawnSeed: 5
+  theme: dark
+  themeVariables:
+    mainBkg: "#333333"
+    clusterBkg: "#242424"
+  themeCSS: |
+    small { display: inline-block; text-align: left; }
+  flowchart:
+    wrappingWidth: 270
+---
+%% Behavior authority: installation.md.
+flowchart LR
+  Init["init<br/><small>selected version</small>"]
+  Global@{ shape: fr-rect, label: "dinyd on PATH<br/><small>select the project's runtime</small>" }
+  Runtime@{ shape: fr-rect, label: "selected dinyd<br/><small>same binary · pinned behavior</small>" }
+  Host@{ shape: fr-rect, label: "agent host" }
+
+  subgraph Project["project · worktree"]
+    Pin@{ shape: doc, label: "version pin" }
+    Bindings@{ shape: docs, label: "host bindings" }
+  end
+
+  Init -->|keep or explicitly change| Pin
+  Init -->|matching templates| Bindings
+  Pin -->|read by| Global
+  Bindings -->|loaded by| Host
+  Host -->|guard payload · project context| Global
+  Global -->|run or delegate| Runtime
+
+  classDef em fill:#173d25,stroke:#86efac
+  classDef file fill:#3d3415,stroke:#fcd34d
+  class Init em
+  class Pin,Bindings file

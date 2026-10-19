@@ -21,8 +21,8 @@ flowchart LR
 
   subgraph Fail["exit 1 · the document must be opened"]
     Broken["malformed · unresolved<br/><small>re-judge the claim and the reference</small>"]
-    Undeclared["undeclared<br/><small>fill the digest with update</small>"]
-    Stale["stale<br/><small>re-judge the claim, then update</small>"]
+    Undeclared["undeclared<br/><small>run digest to record the evidence</small>"]
+    Stale["stale<br/><small>re-judge the claim, then run digest</small>"]
   end
 
   Collect --> Found

@@ -23,8 +23,8 @@ impl Verdict {
         match self {
             Verdict::Ok => "",
             Verdict::Malformed | Verdict::Unresolved => "re-judge the claim and the reference",
-            Verdict::Undeclared => "fill the digest with update",
-            Verdict::Stale => "re-judge the claim, then update",
+            Verdict::Undeclared => "run digest to record the evidence",
+            Verdict::Stale => "re-judge the claim, then run digest",
         }
     }
 }

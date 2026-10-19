@@ -1,0 +1,47 @@
+---
+title: dinyd · preserve locked source before an edit
+config:
+  look: classic
+  theme: dark
+  themeVariables:
+    actorBkg: "#333333"
+    labelBoxBkgColor: "#fcd34d"
+    labelTextColor: "#000000"
+    noteTextColor: "#e0e0e0"
+  themeCSS: |
+    /* database · db */
+    g.actor[transform] path { fill: #1c2f4a; stroke: #93c5fd; }
+    /* database label clears the cylinder */
+    g.actor[transform] + text { transform: translateY(12px); }
+    g.actor[transform] + text tspan { paint-order: stroke; stroke: #1f1f1f; stroke-width: 6px; }
+    /* collections · file */
+    rect.actor:not([rx]) { fill: #3d3415; stroke: #fcd34d; }
+  sequence:
+    actorMargin: 80
+    width: 200
+    wrap: true
+---
+%% Behavior authority: lock.md.
+sequenceDiagram
+  autonumber
+  actor Agent as agent
+  participant Host as agent host
+  participant Guard as selected dinyd
+  participant Doc@{ "type": "collections", "alias": "working-tree document" }
+
+  Agent->>Host: propose a file edit
+  Host->>Guard: before execution · raw arguments and project context
+  Guard->>Doc: read current bytes and lock markers
+
+  rect rgb(23, 61, 37)
+    Note over Guard,Doc: em · preserve the source and its protection
+    Guard->>Guard: preview changed files and re-parse locks
+  end
+
+  alt protected source survives
+    Guard-->>Host: allow
+    Host->>Doc: execute the original edit tool
+  else protected source changes or cannot be verified
+    Guard-->>Host: native denial
+    Host-->>Agent: path and short instruction · no document content
+  end

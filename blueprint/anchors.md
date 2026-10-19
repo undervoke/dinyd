@@ -6,5 +6,6 @@ The code → claim direction is obtained by scanning documents.
 Selectors never name line numbers.
 `s1` hashes tokens and nesting, not node kind names.
 A unit's pairing errors surface on each document that references it; unreferenced units stay silent.
+[Locks](lock.md) own how their markers project out of a `d1` unit.
 
 @import "anchors.mermaid"

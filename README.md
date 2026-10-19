@@ -2,20 +2,37 @@
 
 > Built for my own projects; issues and pull requests are closed. Fork freely.
 
-`dinyd` ties a claim in a document to the code region it restates. When that
-code changes, `dinyd check` fails until a worker — person or agent — opens the
-document, re-judges the claim, and updates the reference. It never prints
-document text, so the only way through is to read the document.
+`dinyd` ties a claim in a document to the region it restates. When that
+region changes, `dinyd check` reports stale evidence. The worker opens the
+document, re-judges the claim, and runs `dinyd digest` to record its evidence
+again. DinyD checks the reference and digest, not whether the worker read or
+judged correctly. Check never prints document text.
 
-dinyd provides the verdict and the update; where it runs (a pre-commit hook,
-CI, an agent's routine) is the project's choice.
+DinyD also protects human-owned document spans through agent file-edit
+hooks. The project chooses where to run check (a pre-commit hook, CI, or an
+agent's routine).
 
 ## Install
 
-Pin one version per project, so hooks, CI, and every clone judge with the
-same binary. Each release on
-[GitHub Releases](https://github.com/undervoke/dinyd/releases) has an archive
-and a `.sha256` checksum for:
+macOS and Linux:
+
+```sh
+curl -LsSf https://github.com/undervoke/dinyd/releases/latest/download/dinyd-installer.sh | sh
+```
+
+Windows PowerShell:
+
+```powershell
+irm https://github.com/undervoke/dinyd/releases/latest/download/dinyd-installer.ps1 | iex
+```
+
+Restart your terminal and GUI agent host after installation so they see the
+updated PATH. Git is required for project operations; a consumer needs no
+Rust, Go, or Node toolchain.
+
+Each release on
+[GitHub Releases](https://github.com/undervoke/dinyd/releases) also has an archive
+and a `.sha256` checksum for manual installation:
 
 | Platform | Archive |
 |---|---|
@@ -26,7 +43,7 @@ and a `.sha256` checksum for:
 | Windows x64 | `dinyd-x86_64-pc-windows-msvc.zip` |
 
 ```sh
-v=v0.2.0 t=x86_64-unknown-linux-musl
+v=v0.3.0 t=x86_64-unknown-linux-musl
 curl -fsSLO "https://github.com/undervoke/dinyd/releases/download/$v/dinyd-$t.tar.xz"
 curl -fsSLO "https://github.com/undervoke/dinyd/releases/download/$v/dinyd-$t.tar.xz.sha256"
 shasum -a 256 -c "dinyd-$t.tar.xz.sha256"
@@ -34,10 +51,47 @@ tar -xJf "dinyd-$t.tar.xz"   # binary at dinyd-$t/dinyd
 ```
 
 With Rust 1.93.0 or later and a C build toolchain,
-`cargo install --locked --git https://github.com/undervoke/dinyd --tag v0.2.0`
+`cargo install --locked --git https://github.com/undervoke/dinyd --tag v0.3.0`
 builds the same version from source. The prebuilt archives need neither.
 
-dinyd runs `git` at run time and must be run inside a Git working tree.
+The generated bootstrap installers do not guarantee checksum verification
+on every platform. Manual verification above and DinyD's own runtime
+cache and self-update downloads verify the archive's full SHA-256.
+
+### Project setup and versions
+
+```sh
+cd your-project
+dinyd init
+```
+
+Init pins one exact version in `.dinyd-version` and offers an agent-host
+checklist. Existing DinyD registrations are preselected. Commit the pin and
+generated project settings so clones use the same version and bindings.
+A clone runs `dinyd init` to prepare its pinned runtime; ordinary setup keeps
+the existing pin.
+
+```sh
+dinyd init --hosts claude-code,codex,cursor
+dinyd init --hosts none
+dinyd init --version latest
+dinyd init --version 0.3.0
+dinyd update
+```
+
+`--hosts` selects the desired bindings (`claude-code`, `codex`, `opencode`,
+`cursor`, `pi`, `kilo`), or `none` to remove DinyD's bindings. Without a
+terminal or `--hosts`, init preserves the existing set; a first unattended
+setup pins only. Other settings are preserved. Init does not wire check into
+Git hooks or CI.
+
+`init --version` explicitly changes the project's version and matching
+bindings. `update` installs the latest stable version over the invoked
+installation without changing any project pin. Cached runtimes cannot
+self-update. Ordinary commands fetch a missing pinned runtime; a guard
+instead denies the edit with an instruction to run init.
+
+Run project commands inside a Git working tree; `dinyd update` also works outside one.
 
 ## Anchors
 
@@ -127,7 +181,7 @@ all of them, in source order, as one region.
   but a document unit.
 - `d1` (document unit): the unit's bytes with CRLF turned into LF and dinyd
   comments taken out — a comment alone on its line with that line, a
-  declaration by itself, an anchor with the one space before it. So adding,
+  declaration or lock marker by itself, an anchor with the one space before it. So adding,
   removing, or updating anchors and inner units never changes it, while any
   other edit inside the unit does. The only mode for document units.
 
@@ -139,6 +193,41 @@ the mode recorded in the anchor.
 `*.mermaid` and `*.mmd` files are documents too. In them an anchor or a unit
 boundary is an own-line `%%` comment after any leading frontmatter, apply
 writes the anchor on a new line after line `n`, and links are not checked.
+
+## Locked sections
+
+Wrap human-owned Markdown source with:
+
+```md
+<!-- dinyd-lock -->
+Only a human may change this policy.
+<!-- /dinyd-lock -->
+```
+
+Markers may also be inline. In `.mermaid` and `.mmd`, use own-line
+`%% dinyd-lock` and `%% /dinyd-lock`. Literal code examples and Mermaid
+frontmatter follow the same exclusions as references. Multiple and nested
+locks need no names.
+
+The guard preserves the existing locked bytes, including the marker
+comments, and their relative order. It permits edits outside them and
+intact moves within the same file. It denies deleting or moving a locked
+file, changing a locked span, making its markers disappear into a code
+example, or an edit it cannot reconstruct exactly. One failing file blocks
+the entire tool call. Broken lock markers in an existing file require human
+repair. A new file may introduce locks.
+
+The agent receives a short denial:
+
+```text
+docs/policy.md: locked section. Leave it unchanged.
+```
+
+`dinyd init` installs bindings for Claude Code, Codex Desktop, OpenCode
+v1 >= 1.18.29 and v2, Cursor Agent, Pi, and current Kilo Code. In Orca, select
+the agents it launches. Complete the host's trust/reload steps after init.
+The guard handles the hosts' file-edit tools; it does not intercept shell
+writes or Cursor Tab completions. It is an editing guardrail, not a sandbox.
 
 ## Commands
 
@@ -152,13 +241,13 @@ Judges every anchor and local link destination and prints one line per
 failure; exit 1 if any fail.
 
 ```
-docs/auth.md → src/Hasher.cs#PasswordHasher.Verify: stale — re-judge the claim, then update
+docs/auth.md → src/Hasher.cs#PasswordHasher.Verify: stale — re-judge the claim, then run digest
 ```
 
 | Verdict | Meaning | Next step |
 |---|---|---|
-| `stale` | The target changed since the digest | Re-judge the claim, then `update` |
-| `undeclared` | A hand-written digest anchor without a digest | `update` fills it |
+| `stale` | The target changed since the digest | Re-judge the claim, then `digest` |
+| `undeclared` | A hand-written digest anchor without a digest | `digest` fills it |
 | `unresolved` | The target is missing, ambiguous, of a disallowed kind (such as a symlink), or cannot be parsed; a unit is not declared exactly once or its end comes first; a link names no existing path | Re-judge the claim and the reference |
 | `malformed` | The anchor or unit declaration itself is broken | Re-judge the claim and the reference |
 
@@ -192,18 +281,18 @@ writing nothing, when the target does not resolve, the same anchor is already
 there, or check's parser would not read the written anchor, as inside a code
 block.
 
-### update
+### digest
 
 ```sh
-dinyd update <doc> --line <n> --expect-selector <selector> [--index | --worktree | --rev <commit>]
+dinyd digest <doc> --line <n> --expect-selector <selector> [--index | --worktree | --rev <commit>]
 ```
 
 Recomputes the digest of the one digest anchor on line `n` whose selector is
 `<selector>`, with its recorded mode, and rewrites only the digest. It prints
 the new `mode:digest`, or `unchanged`. To change the mode, edit it in the
-anchor by hand and run update.
+anchor by hand and run digest.
 
-Line numbers count from 1 by LF. apply and update write only the anchor and
+Line numbers count from 1 by LF. apply and digest write only the anchor and
 keep every other byte, CRLF included. After either, stage the document before
 judging with `--index`.
 
@@ -211,8 +300,8 @@ judging with `--index`.
 
 | Code | Meaning |
 |---|---|
-| 0 | check: every checked reference is ok; apply, update: written or unchanged |
-| 1 | check: at least one failure; apply, update: refused, nothing written |
+| 0 | check: every checked reference is ok; apply, digest: written or unchanged |
+| 1 | check: at least one failure; apply, digest: refused, nothing written |
 | 2 | Usage or read error |
 
 ## License

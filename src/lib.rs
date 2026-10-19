@@ -2,9 +2,14 @@
 
 pub mod anchor;
 pub mod check;
+pub mod download;
 pub mod edit;
 pub mod git;
+pub mod guard;
+pub mod install;
 pub mod link;
+pub mod lock;
+pub mod runtime;
 pub mod target;
 pub mod unit;
 
@@ -16,7 +21,7 @@ pub enum Error {
     Usage(String),
     /// Git or file read failure; exit 2.
     Read(String),
-    /// apply or update declined to write; exit 1.
+    /// A requested operation declined to write; exit 1.
     Refused(String),
 }
 

@@ -49,8 +49,8 @@ pub fn content(kind: DocKind, src: &str, name: &str) -> Result<Vec<u8>, String> 
 }
 
 /// What a dinyd comment inside a unit removes: its whole line when it stands alone there;
-/// otherwise a declaration is zero-width and a reference takes the one space apply puts
-/// before it.
+/// otherwise a declaration or lock marker is zero-width and a reference takes the one space
+/// apply puts before it.
 fn cut(src: &str, comment: &Comment) -> Option<Range<usize>> {
     let (keyword, _) = comment.keyword(src)?;
     let extent = comment.extent.clone();

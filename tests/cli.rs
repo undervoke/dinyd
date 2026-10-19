@@ -98,7 +98,7 @@ impl Repo {
     }
 }
 
-const STALE: &str = "stale — re-judge the claim, then update";
+const STALE: &str = "stale — re-judge the claim, then run digest";
 const UNRESOLVED: &str = "unresolved — re-judge the claim and the reference";
 const MALFORMED: &str = "malformed — re-judge the claim and the reference";
 

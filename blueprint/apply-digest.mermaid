@@ -1,5 +1,5 @@
 ---
-title: dinyd · creating and updating relationships
+title: dinyd · creating relationships and recording evidence
 config:
   look: classic
   theme: dark
@@ -21,7 +21,7 @@ config:
     width: 200
     wrap: true
 ---
-%% Behavior authority: apply-update.md.
+%% Behavior authority: apply-digest.md.
 sequenceDiagram
   autonumber
   actor Worker as worker<br/>person · agent
@@ -33,7 +33,7 @@ sequenceDiagram
   Worker->>Dinyd: apply B.md --line N --selector A.cs#35;Foo
   Dinyd->>Doc: write the anchor and first digest
 
-  Note over Worker,Dinyd: the evidence code changes
+  Note over Worker,Dinyd: the selected evidence changes
   Worker->>Dinyd: check
   Dinyd-->>Worker: B.md → A.cs#35;Foo: stale<br/>no line number · no document content
 
@@ -45,5 +45,5 @@ sequenceDiagram
     end
   end
 
-  Worker->>Dinyd: update B.md --line N --expect-selector A.cs#35;Foo
+  Worker->>Dinyd: digest B.md --line N --expect-selector A.cs#35;Foo
   Dinyd->>Doc: rewrite only the digest

@@ -16,19 +16,24 @@ config:
 flowchart LR
   Tag["version tag push"]
   subgraph Build["GitHub Actions · dist"]
-    Matrix["per-platform builds<br/><small>• linux x64 · arm64 (musl)<br/>• macOS arm64 · x64<br/>• Windows x64</small>"]
-    Release@{ shape: docs, label: "GitHub Releases<br/><small>archive · checksum</small>" }
+    Matrix["native platform builds"]
+    Release@{ shape: docs, label: "release artifacts<br/><small>archives · checksums · installers</small>" }
     Matrix --> Release
   end
-  subgraph Consumer["consuming project"]
-    Invoke["run dinyd<br/><small>• gate · check while working<br/>• verdict by exit code</small>"]
-    GitBin@{ shape: fr-rect, label: "git<br/><small>needed at run time</small>" }
-    Invoke --> GitBin
-  end
+  Bootstrap["bootstrap installer<br/><small>user bin · PATH</small>"]
+  Fetch["native acquisition<br/><small>verify the archive's SHA-256</small>"]
+  Global@{ shape: fr-rect, label: "dinyd on PATH" }
+  Cache@{ shape: bow-rect, label: "exact-version runtimes" }
+
   Tag --> Matrix
-  Release --> Invoke
+  Release --> Bootstrap --> Global
+  Release --> Fetch
+  Fetch -->|project runtime| Cache
+  Fetch -->|self-update| Global
 
   classDef em fill:#173d25,stroke:#86efac
+  classDef cache fill:#163a40,stroke:#67e8f9
   classDef file fill:#3d3415,stroke:#fcd34d
-  class Invoke em
+  class Fetch em
+  class Cache cache
   class Release file

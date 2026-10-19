@@ -1,4 +1,4 @@
-//! apply and update: the only writes, each touching one anchor in one document.
+//! apply and digest: each touches one anchor in one document.
 
 use std::path::Path;
 
@@ -113,20 +113,20 @@ pub fn apply(repo: &Repo, request: ApplyRequest) -> Result<(String, String), Err
     Ok((text, basis))
 }
 
-pub struct UpdateRequest<'a> {
+pub struct DigestRequest<'a> {
     pub doc: &'a Path,
     pub line: usize,
     pub expect_selector: &'a str,
     pub basis: Basis,
 }
 
-pub enum Updated {
+pub enum Digested {
     Written(Mode, String),
     Unchanged,
 }
 
 /// Recomputes one digest anchor with its recorded mode and rewrites only its digest.
-pub fn update(repo: &Repo, request: UpdateRequest) -> Result<Updated, Error> {
+pub fn digest(repo: &Repo, request: DigestRequest) -> Result<Digested, Error> {
     let (doc, kind, source) = read_doc(repo, request.doc)?;
     let expected: Option<Selector> = anchor::parse_selector(request.expect_selector);
     let anchors: Vec<Anchor> = anchor::scan(kind, &source)
@@ -174,7 +174,7 @@ pub fn update(repo: &Repo, request: UpdateRequest) -> Result<Updated, Error> {
         Err(Failure::Read(e)) => return Err(e),
     };
     if recorded.is_some_and(|(_, old)| *old == value) {
-        return Ok(Updated::Unchanged);
+        return Ok(Digested::Unchanged);
     }
     let token = format!("{}:{value}", mode.as_str());
     let mut updated = source.clone();
@@ -183,7 +183,7 @@ pub fn update(repo: &Repo, request: UpdateRequest) -> Result<Updated, Error> {
         None => updated.insert_str(anchor.selector_span.end, &format!(" {token}")),
     }
     write_doc(repo, &doc, &updated)?;
-    Ok(Updated::Written(mode, value))
+    Ok(Digested::Written(mode, value))
 }
 
 fn read_doc(repo: &Repo, given: &Path) -> Result<(String, DocKind, String), Error> {
