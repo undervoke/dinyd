@@ -6,6 +6,7 @@ use std::fmt;
 use crate::Error;
 use crate::anchor::{self, Anchor, DocKind, Kind};
 use crate::git::{self, Basis, Repo, Snapshot};
+use crate::link;
 use crate::target::{self, Failure};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -42,6 +43,7 @@ impl fmt::Display for Verdict {
 
 pub struct Finding {
     pub doc: String,
+    /// The anchor's selector, or `link` and the destination as written.
     pub selector: String,
     pub verdict: Verdict,
     /// Why the target did not resolve; goes to stderr.
@@ -67,7 +69,7 @@ pub enum Scope {
     Changed(String),
 }
 
-/// Failing anchors in document order.
+/// Failing anchors in document order, then each document's failing links.
 pub fn check(repo: &Repo, basis: Basis, scope: Scope) -> Result<Vec<Finding>, Error> {
     let changed = match &scope {
         Scope::All => None,
@@ -94,6 +96,31 @@ pub fn check(repo: &Repo, basis: Basis, scope: Scope) -> Result<Vec<Finding>, Er
                 });
             }
         }
+        if kind != DocKind::Markdown {
+            continue;
+        }
+        // Without line numbers, repeats of one destination would print identical lines.
+        let mut reported = BTreeSet::new();
+        for link in link::scan(&doc, &source) {
+            if let Some(changed) = &changed
+                && !match &link.target {
+                    Ok(target) => touches(changed, &doc, &target.path),
+                    Err(_) => changed.contains(&doc),
+                }
+            {
+                continue;
+            }
+            if let Some(reason) = link::judge(&snapshot, &link)
+                && reported.insert(link.written.clone())
+            {
+                findings.push(Finding {
+                    doc: doc.clone(),
+                    selector: link.display(),
+                    verdict: Verdict::Unresolved,
+                    reason: Some(reason),
+                });
+            }
+        }
     }
     Ok(findings)
 }
@@ -102,9 +129,19 @@ fn selected(anchor: &Anchor, doc: &str, changed: &BTreeSet<String>) -> bool {
     let Some(selector) = &anchor.selector else {
         return true;
     };
-    let under = format!("{}/", selector.path);
+    touches(changed, doc, &selector.path)
+}
+
+/// Whether the document, the target path, or anything under it changed.
+fn touches(changed: &BTreeSet<String>, doc: &str, path: &str) -> bool {
+    // The root (an empty path) holds every changed path.
+    let under = if path.is_empty() {
+        String::new()
+    } else {
+        format!("{path}/")
+    };
     changed.contains(doc)
-        || changed.contains(&selector.path)
+        || changed.contains(path)
         || changed
             .range(under.clone()..)
             .next()

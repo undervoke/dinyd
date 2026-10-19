@@ -15,7 +15,7 @@ dinyd ties a claim in a document to the code region that is its evidence. When c
 
 ## anchors
 
-The two kinds of references a document holds (digest anchor · delegation), per-format selectors, document units, and digest modes.
+The two kinds of references a document holds (digest anchor · delegation), per-format selectors, document units, links, and digest modes.
 
 @import "anchors.mermaid"
 

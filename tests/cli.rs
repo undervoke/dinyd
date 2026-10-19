@@ -1213,3 +1213,225 @@ fn a_mermaid_unit_is_the_lines_between_its_markers() {
         [format!("doc.md → d.mermaid#edge: {STALE}")]
     );
 }
+
+#[test]
+fn a_link_follows_renames_in_each_view() {
+    let repo = Repo::new();
+    repo.write("docs/verification/checks.md", "checks\n");
+    repo.write(
+        "docs/guide.md",
+        "Read [Checks](verification/checks.md) first.\n",
+    );
+    repo.commit("base");
+    assert_eq!(repo.check(&[]).code, 0);
+
+    repo.git(&[
+        "mv",
+        "docs/verification/checks.md",
+        "docs/verification/rules.md",
+    ]);
+    let run = repo.check(&[]);
+    assert_eq!(run.code, 1);
+    assert_eq!(
+        run.lines(),
+        [format!(
+            "docs/guide.md → link verification/checks.md: {UNRESOLVED}"
+        )]
+    );
+    assert!(
+        run.stderr
+            .contains("no such path: docs/verification/checks.md"),
+        "{}",
+        run.stderr
+    );
+
+    repo.git(&[
+        "mv",
+        "docs/verification/rules.md",
+        "docs/verification/checks.md",
+    ]);
+    std::fs::rename(
+        repo.path().join("docs/verification/checks.md"),
+        repo.path().join("docs/verification/rules.md"),
+    )
+    .unwrap();
+    assert_eq!(repo.check(&[]).code, 0, "the index still has the target");
+    assert_eq!(repo.check(&["--worktree"]).code, 1);
+
+    std::fs::rename(
+        repo.path().join("docs/verification/rules.md"),
+        repo.path().join("docs/verification/checks.md"),
+    )
+    .unwrap();
+    repo.write(
+        "docs/guide.md",
+        "Read [Rules](verification/rules.md) first.\n",
+    );
+    assert_eq!(
+        repo.check(&[]).code,
+        0,
+        "the index still has the old document"
+    );
+    assert_eq!(
+        repo.check(&["--worktree"]).lines(),
+        [format!(
+            "docs/guide.md → link verification/rules.md: {UNRESOLVED}"
+        )]
+    );
+    repo.commit("rules");
+    assert_eq!(repo.check(&["--rev", "HEAD~1"]).code, 0);
+    assert_eq!(repo.check(&["--rev", "HEAD"]).code, 1);
+}
+
+#[test]
+fn links_resolve_from_the_document_directory() {
+    let repo = Repo::new();
+    repo.write("top.md", "top\n");
+    repo.write("src/main.go", "package main\n");
+    repo.write(
+        "a/b/doc.md",
+        "[up](../../top.md) [dir](../../src/) [bare dir](../../src) [rooted](/src/main.go) [root](/)\n\n\
+         [file as dir](../../top.md/) [out](../../../x.md)\n",
+    );
+    repo.commit("base");
+    let run = repo.check(&[]);
+    assert_eq!(
+        run.lines(),
+        [
+            format!("a/b/doc.md → link ../../top.md/: {UNRESOLVED}"),
+            format!("a/b/doc.md → link ../../../x.md: {UNRESOLVED}"),
+        ]
+    );
+    assert!(
+        run.stderr.contains("not a directory: top.md"),
+        "{}",
+        run.stderr
+    );
+    assert!(
+        run.stderr.contains("leaves the repository"),
+        "{}",
+        run.stderr
+    );
+}
+
+#[test]
+fn urls_fragments_and_code_are_not_links() {
+    let repo = Repo::new();
+    repo.write(
+        "doc.md",
+        "[url](https://example.com/m1.md) <https://example.com/m2.md> [mail](mailto:a@b.c) \
+         [host](//host/m3.md) [frag](#m4) [empty]()\n\n\
+         ```md\n[fenced](m5.md)\n@import \"m6.mermaid\"\n```\n\n\
+         `[inline](m7.md)` and `tools/m8.mjs`\n\n\
+         \x20   [indented](m9.md)\n\n\
+         <a href=\"m10.md\">raw</a>\n\n\
+         <!--\n@import \"m11.mermaid\"\n-->\n\n\
+         Disabled: <!--\n@import \"m15.mermaid\"\n-->\n\n\
+         <div>\n@import \"m12.mermaid\"\n</div>\n",
+    );
+    repo.write(
+        "front.md",
+        "---\ndescription: |\n  @import \"m13.mermaid\"\n  [front](m14.md)\n---\n\nbody\n",
+    );
+    repo.commit("base");
+    let run = repo.check(&[]);
+    assert_eq!((run.code, run.stdout.as_str()), (0, ""), "{}", run.stderr);
+}
+
+#[test]
+fn link_paths_are_decoded_and_imports_are_literal() {
+    let repo = Repo::new();
+    repo.write("my notes.md", "notes\n");
+    repo.write("a+b.md", "plus\n");
+    repo.write("flow.mermaid", "flowchart LR\n  A --> B\n");
+    repo.write(
+        "doc.md",
+        "[q](a+b.md?raw=1#top) [space](my%20notes.md) [angle](<my notes.md>)\n\n\
+         @import \"flow.mermaid\"\n\
+         @import \"a%2Bb.md\"\n\
+         \x20 @import \"gone.mermaid\" {width=\"300px\"}\n",
+    );
+    repo.commit("base");
+    assert_eq!(
+        repo.check(&[]).lines(),
+        [
+            format!("doc.md → link a%2Bb.md: {UNRESOLVED}"),
+            format!("doc.md → link gone.mermaid: {UNRESOLVED}"),
+        ]
+    );
+}
+
+#[test]
+fn deleting_a_target_selects_the_documents_that_link_it() {
+    let repo = Repo::new();
+    repo.write("t/target.md", "target\n");
+    repo.write("t/other.md", "other\n");
+    repo.write("a.md", "[target](t/target.md)\n");
+    repo.write("b.md", "[dir](t/)\n");
+    repo.write("c.md", "[old](gone.md)\n");
+    repo.commit("base");
+
+    repo.git(&["rm", "-q", "t/target.md"]);
+    assert_eq!(
+        repo.check(&["--changed"]).lines(),
+        [format!("a.md → link t/target.md: {UNRESOLVED}")]
+    );
+    assert_eq!(
+        repo.check(&[]).lines().len(),
+        2,
+        "the full scope also reports c.md"
+    );
+
+    repo.git(&["rm", "-q", "t/other.md"]);
+    assert_eq!(
+        repo.check(&["--changed"]).lines(),
+        [
+            format!("a.md → link t/target.md: {UNRESOLVED}"),
+            format!("b.md → link t/: {UNRESOLVED}"),
+        ],
+        "removing the last file under a linked directory selects its document"
+    );
+
+    repo.commit("next");
+    repo.write("d.md", "[out](../x.md)\n");
+    repo.commit("out");
+    repo.write("unrelated.txt", "x\n");
+    repo.git(&["add", "unrelated.txt"]);
+    assert_eq!(
+        repo.check(&["--changed"]).lines(),
+        Vec::<String>::new(),
+        "a link naming no path is selected only with its document"
+    );
+    assert_eq!(
+        repo.check(&["--changed", "--base", "HEAD~1"]).lines(),
+        [format!("d.md → link ../x.md: {UNRESOLVED}")]
+    );
+}
+
+#[test]
+fn a_broken_destination_is_reported_once_without_prose() {
+    let repo = Repo::new();
+    repo.write(
+        "doc.md",
+        "See [the secret label][ref], [again](gone.md), and [twice](gone.md \"Secret Title\").\n\n\
+         ![alt prose](img/missing.png) [tab](a&#9;b.md)\n\n\
+         [ref]: ref-gone.md\n",
+    );
+    repo.commit("base");
+    let run = repo.check(&[]);
+    assert_eq!(
+        run.lines(),
+        [
+            format!("doc.md → link ref-gone.md: {UNRESOLVED}"),
+            format!("doc.md → link gone.md: {UNRESOLVED}"),
+            format!("doc.md → link img/missing.png: {UNRESOLVED}"),
+            format!("doc.md → link a\\tb.md: {UNRESOLVED}"),
+        ]
+    );
+    assert!(
+        run.stderr.contains("no such path: a\\tb.md\n"),
+        "{}",
+        run.stderr
+    );
+    assert!(!run.stderr.contains('\t'), "{}", run.stderr);
+}

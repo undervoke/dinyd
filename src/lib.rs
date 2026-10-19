@@ -4,6 +4,7 @@ pub mod anchor;
 pub mod check;
 pub mod edit;
 pub mod git;
+pub mod link;
 pub mod target;
 pub mod unit;
 

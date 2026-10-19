@@ -197,15 +197,19 @@ pub fn comments(kind: DocKind, src: &str) -> Vec<Comment> {
     }
 }
 
+/// Parser options shared by every Markdown pass, so that all of them agree on what is code.
+pub fn markdown_options() -> Options {
+    Options::ENABLE_TABLES
+        | Options::ENABLE_STRIKETHROUGH
+        | Options::ENABLE_TASKLISTS
+        | Options::ENABLE_FOOTNOTES
+}
+
 /// HTML comments anywhere outside code. The parser supplies only the code to skip
 /// (fenced and indented blocks, inline code spans): it drops some comments from its events,
 /// such as one after a table row's last pipe, and an unterminated comment is not HTML to it.
 fn markdown_comments(src: &str) -> Vec<Comment> {
-    let options = Options::ENABLE_TABLES
-        | Options::ENABLE_STRIKETHROUGH
-        | Options::ENABLE_TASKLISTS
-        | Options::ENABLE_FOOTNOTES;
-    let mut code: Vec<Range<usize>> = Parser::new_ext(src, options)
+    let mut code: Vec<Range<usize>> = Parser::new_ext(src, markdown_options())
         .into_offset_iter()
         .filter(|(event, _)| matches!(event, Event::Start(Tag::CodeBlock(_)) | Event::Code(_)))
         .map(|(_, range)| range)

@@ -80,6 +80,34 @@ nest or overlap. A name is ASCII letters, digits, `_`, `.`, and `-`, and must
 be declared exactly once per document; declarations follow the same code and
 frontmatter rules as anchors.
 
+### Links
+
+A link is a reference too: every Markdown link, image, and own-line
+[Markdown Preview Enhanced](https://shd101wyy.github.io/markdown-preview-enhanced/)
+`@import "path"` must name a path that exists in the same view as the
+document, with no anchor written next to it.
+
+```md
+Read [Checks](verification/checks.md), then the [migrations](../../db/migrations/).
+
+@import "checks.mermaid"
+```
+
+- A link destination is relative to the document's directory, as the
+  renderer reads it; a leading `/` starts at the repository root. Selectors,
+  by contrast, are always repository-root paths.
+- Its `?query` and `#fragment` are ignored, and the rest is percent-decoded
+  once. An `@import` path is taken literally.
+- A trailing `/` asks for a directory; without one, a file or a directory
+  will do. A path that climbs above the repository root does not resolve.
+- URLs, same-document `#fragment` links, and anything in code, frontmatter,
+  or raw HTML (an HTML comment included) are not checked. To mention a path
+  that should not be checked, write it as inline code.
+
+`dinyd-ref` remains for what a link cannot carry: a location such as a
+symbol or a unit, a path mentioned in prose or inline code, and references
+in `.mermaid` documents.
+
 ### Selectors
 
 `path#location`. The path is the Git path from the repository root, with `/`
@@ -132,8 +160,15 @@ docs/auth.md → src/Hasher.cs#PasswordHasher.Verify: stale — re-judge the cla
 |---|---|---|
 | `stale` | The target changed since the digest | Re-judge the claim, then `update` |
 | `undeclared` | A hand-written digest anchor without a digest | `update` fills it |
-| `unresolved` | The target is missing, ambiguous, of a disallowed kind (such as a symlink), or cannot be parsed; a unit is not declared exactly once or its end comes first | Re-judge the claim and the reference |
+| `unresolved` | The target is missing, ambiguous, of a disallowed kind (such as a symlink), or cannot be parsed; a unit is not declared exactly once or its end comes first; a link names no existing path | Re-judge the claim and the reference |
 | `malformed` | The anchor or unit declaration itself is broken | Re-judge the claim and the reference |
+
+A failing link prints `link` and its destination as written, once per
+document:
+
+```
+docs/guide.md → link verification/checks.md: unresolved — re-judge the claim and the reference
+```
 
 Output never carries line numbers, digests, or document text; the reason a
 target did not resolve goes to stderr.
@@ -143,8 +178,8 @@ target did not resolve goes to stderr.
   commit. Documents and targets always come from the same view.
 - `--changed` judges only anchors in changed documents and anchors whose
   target path changed, including deletions and renames, against `HEAD` or
-  `--base`. With `--rev`, `--base` is required. Malformed anchors are always
-  judged.
+  `--base`; a link is judged when its document or its path changed. With
+  `--rev`, `--base` is required. Malformed anchors are always judged.
 
 ### apply
 
