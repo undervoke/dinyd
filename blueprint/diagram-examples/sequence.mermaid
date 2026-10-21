@@ -1,5 +1,5 @@
 ---
-title: Example · sequence diagram
+title: Example · Sequence diagram
 config:
   look: classic
   theme: dark
@@ -24,52 +24,75 @@ config:
     wrap: true
 ---
 %% Behavior authority: <domain>.md.
+%% Participant `type`: `boundary` (entry point) · `control` (logic) · `entity` (domain record) · `database` · `queue` · `collections`; `actor` is a person.
+%% Arrows: `->>` call · `-->>` reply · `-)` async · `-x` failed · `->` `-->` no head · `<<->>` two-way · `-|\` half head; `()` on either end meets the lifeline centre.
+%% `+`/`-` on an arrow, or `activate X` / `deactivate X`, marks execution; `create`/`destroy` bound a participant's life; `link X: label @ url` or `links X: {"label": "url", …}` adds a menu, except on `boundary` · `control` · `entity`, where the whole diagram fails to render.
+%% `<<-->>` two-way reply · `--x` failed reply.
+%% `create actor D as Name` creates an actor; `#9829;` · `#infin;` entity codes write symbols in message text.
+%% Blocks: `critical`/`option` · `loop` · `par`/`and` · `alt`/`else` · `opt` · `break` · `rect rgb(…)` highlight; `autonumber start step`.
 sequenceDiagram
-  autonumber
-  actor User as developer
-  box rgb(36, 36, 36) COA · system boundary
-    participant Runtime as runtime<br/>call handling
-    participant Worker as worker
+  autonumber 1 1
+  actor User as Customer
+  box rgb(36, 36, 36) Order service · system boundary
+    participant API@{ "type": "boundary", "alias": "Order API" }
+    participant Worker as Fulfilment worker<br/>background
+    participant Rules@{ "type": "control", "alias": "Pricing rules" }
   end
-  participant DB@{ "type": "database", "alias": "state DB" }
-  participant Queue@{ "type": "queue", "alias": "delivery queue" }
-  participant Logs@{ "type": "collections", "alias": "native logs" }
+  participant Order@{ "type": "entity", "alias": "Order record" }
+  participant DB@{ "type": "database", "alias": "Order DB" }
+  participant Queue@{ "type": "queue", "alias": "Event queue" }
+  participant Logs@{ "type": "collections", "alias": "Audit log" }
+  link DB: Runbook @ https://example.com/runbook
 
-  User->>+Runtime: task request
-  Runtime->>Runtime: check input·permissions
-  critical accept transaction
-    Runtime->>DB: store operation
-  option store failed
-    Runtime-->>User: synchronous error
+  User->>+API: Place order
+  API->>API: Validate cart and stock
+  API->>()Rules: Price cart
+  activate Rules
+  Rules-->>API: Total with discounts
+  deactivate Rules
+  critical Accept transaction
+    API->>DB: Insert order
+    DB-->Order: Row maps to record
+  option Insert fails
+    API-->>User: Synchronous error
   end
-  Runtime-)Worker: run notice · no wait for a reply
-  Runtime-->>-User: accepted reply
+  API-)Worker: Start fulfilment · no reply awaited
+  API-->>-User: Order accepted
 
   rect rgb(23, 61, 37)
-    Note right of Worker: em · the span being explained
-    loop until the final result
-      par collect events
-        Worker->>Logs: record run events
-      and report status
-        Worker->>DB: store progress
+    Note right of Worker: em · the span this diagram explains
+    loop Until shipped
+      par Record events
+        Worker->>Logs: Append fulfilment event
+      and Report progress
+        Worker-|\Order: Update status
+        Order->DB: Persist
       end
     end
   end
 
-  alt success
-    Worker->>Queue: publish the result
-    Queue--)User: asynchronous delivery
-  else publish failed
+  create participant Courier
+  Worker->>Courier: Hand over parcel
+  Courier<<->>User: Arrange delivery slot
+  Courier-->>Worker: Delivered
+  destroy Courier
+  Worker->>Courier: Close handover
+
+  alt Shipped
+    Worker->>Queue: Publish OrderShipped
+    Queue--)User: Asynchronous notification
+  else Publish rejected
     rect rgb(66, 35, 35)
-      Worker-xQueue: publish rejected · issue
+      Worker-xQueue: Publish rejected · issue
     end
   end
 
-  opt cancel request
-    User->>Runtime: cancel
-    break already finished
-      Runtime-->>User: existing final state
+  opt Customer cancels
+    User->>API: Cancel order
+    break Already shipped
+      API-->>User: Return final status
     end
   end
 
-  Note over Runtime,DB: • a note spanning participants<br/>• one line per distinct statement
+  Note left of User: A single-side note
+  Note over API,DB: • A note spanning several participants<br/>• One line per distinct sentence

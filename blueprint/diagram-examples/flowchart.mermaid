@@ -1,5 +1,5 @@
 ---
-title: Example · blueprint diagram rules
+title: Example · Blueprint diagram rules
 config:
   look: handDrawn
   handDrawnSeed: 5
@@ -15,31 +15,41 @@ config:
 %% Behavior authority: <domain>.md.
 %% Infrastructure nodes: `id@{ shape: …, label: "…" }` with the shape and kind class shown here.
 %% Tune `flowchart.wrappingWidth` per diagram.
+%% `flowchart` (alias `graph`) takes `TB` or `TD` · `BT` · `LR` · `RL`; frontmatter `layout: dagre` or `elk` picks the layout (Mermaid 12 defaults to ELK, 11.16 to Dagre) and `flowchart.curve` the default edge curve.
+%% Bracket shapes: `[ ]` `( )` `([ ])` `[[ ]]` `[( )]` `(( ))` `> ]` `{ }` `{{ }}` `[/ /]` `[\ \]` `[/ \]` `[\ /]` `((( )))`.
+%% More `shape:` names: rect rounded stadium fr-rect cyl circle odd diam hex lean-r lean-l trap-b trap-t dbl-circ text notch-rect lin-rect sm-circ fr-circ fork hourglass brace brace-r braces bolt doc delay h-cyl lin-cyl curv-trap div-rect tri win-pane f-circ lin-doc notch-pent flip-tri sl-rect docs st-rect flag bow-rect cross-circ tag-doc tag-rect bang cloud datastore; `browser` `bucket` `console` `folder` `person` draw only in Mermaid 12.
+%% `@{ icon: "pack:name", form, pos, h }` draws an icon from a registered pack (MPE shows `?`); `@{ img: "url", w, h }` an image; a subgraph's `@{ view: collapsed }` hides its nodes in Mermaid 12, while 11.16 accepts and ignores it; inline `fa:fa-user` text icons draw only in Mermaid Preview.
+%% Edges: `-->` call · `-.->` async · `==>` main path · `---` association · `-.-` · `===` · `--o` · `--x` · `~~~` layout only; `o--o` · `x--x` · `<-->` head both ends; `A & B --> C & D` fans in and out.
+%% Labels: `|text|`, or text between the strokes as in `-- text -->`, `-. text .->`, `== text ==>`, `-- text ---`; one more `-`, `.` or `=` adds a rank (`--->`, `-..->`, `-- text ---->`).
+%% `id@-->` names an edge for `id@{ curve: …, animate: true, animation: fast|slow }` and for `class id …`, which `look: handDrawn` ignores; `linkStyle 0,2 …` or `linkStyle default …` styles edges by definition order in either look.
+%% A label in "` `" is a markdown string: `**bold**`, `*italic*`, and a raw newline breaks the line (`markdownAutoWrap: false` stops wrapping). `#quot;` or `#35;` escapes a character.
+%% `class a,b name` or `id:::name` attaches a class; `classDef a,b …` defines several at once and `classDef default …` restyles nodes without a class; `style id …` styles one node.
+%% `click id href "url" "tooltip" _blank` links a node (`_self` · `_parent` · `_top` also work); `click id callback` or `click id call fn()` calls a page function (both need the host's `securityLevel: loose`).
+%% `direction` inside a subgraph sets its own flow unless one of its nodes links outside it; an edge may start or end at a subgraph id. Run a long chain across the outer direction, as `Edges` does, to keep the diagram from stretching one way.
 flowchart LR
-  subgraph Source["shared attribute as the group name"]
-    Plain["plain node<br/><small>one statement takes no bullet</small>"]
-    Multi["several statements<br/><small>• one bullet per distinct statement<br/>• an ordered flow A → B → C stays one line</small>"]
+  subgraph Source["Shared attribute as the group name"]
+    Plain["Basic node<br/><small>One-sentence detail takes no bullet</small>"]
+    Multi["Several details<br/><small>• One bullet per distinct sentence<br/>• An ordered flow A → B → C stays one line</small>"]
   end
 
-  Plain --> Focus["focus · em<br/><small>what the diagram explains</small>"]
-  Multi --> Defect["defect · issue<br/><small>an observed defect</small>"]
-  Multi --> Old["previous structure · legacy<br/><small>kept for compatibility</small>"]
+  Plain --> Focus["Focus · em<br/><small>What the diagram explains</small>"]
+  Multi --> Defect["Defect · issue<br/><small>Observed defect</small>"]:::issue
+  Multi --> Old["Previous structure · legacy<br/><small>Kept for compatibility</small>"]
 
-  subgraph Infra["infrastructure shapes"]
-    UI@{ shape: curv-trap, label: "screen<br/><small>curv-trap</small>" }
-    API@{ shape: st-rect, label: "API instances<br/><small>st-rect · replicas·pool</small>" }
-    Job@{ shape: hex, label: "batch job<br/><small>hex</small>" }
-    Proc@{ shape: fr-rect, label: "subprocess<br/><small>fr-rect</small>" }
-    DB@{ shape: cyl, label: "database · db<br/><small>cyl</small>" }
-    Vol@{ shape: lin-cyl, label: "volume·disk · db<br/><small>lin-cyl</small>" }
-    Cache@{ shape: bow-rect, label: "cache · cache<br/><small>bow-rect</small>" }
-    Mem@{ shape: win-pane, label: "in-memory state · cache<br/><small>win-pane</small>" }
-    Queue@{ shape: h-cyl, label: "queue·stream · queue<br/><small>h-cyl</small>" }
-    Conf@{ shape: doc, label: "config file · file<br/><small>doc</small>" }
-    Logs@{ shape: docs, label: "logs·file set · file<br/><small>docs</small>" }
-    SaaS@{ shape: cloud, label: "external service · ext<br/><small>cloud</small>" }
-    UI --> API
-    Conf --> API
+  subgraph Infra["Infrastructure shapes"]
+    UI@{ shape: curv-trap, label: "Screen<br/><small>curv-trap</small>" }
+    API@{ shape: st-rect, label: "API instances<br/><small>st-rect · replicas, pool</small>" }
+    Job@{ shape: hex, label: "Batch job<br/><small>hex</small>" }
+    Proc@{ shape: fr-rect, label: "Subprocess<br/><small>fr-rect</small>" }
+    DB@{ shape: cyl, label: "Database · db<br/><small>cyl</small>" }
+    Vol@{ shape: lin-cyl, label: "Volume, disk · file<br/><small>lin-cyl</small>" }
+    Cache@{ shape: bow-rect, label: "Cache · cache<br/><small>bow-rect</small>" }
+    Mem@{ shape: win-pane, label: "In-memory state · cache<br/><small>win-pane</small>" }
+    Queue@{ shape: h-cyl, label: "Queue, stream · queue<br/><small>h-cyl</small>" }
+    Conf@{ shape: doc, label: "Config file · file<br/><small>doc</small>" }
+    Logs@{ shape: docs, label: "Log, file set · file<br/><small>docs</small>" }
+    SaaS@{ shape: cloud, label: "External service · ext<br/><small>cloud</small>" }
+    UI & Conf --> API
     API --> DB
     API --> Cache
     API --> Mem
@@ -50,21 +60,49 @@ flowchart LR
     Job --> Logs
   end
 
+  subgraph Edges["Edge syntax · order flow"]
+    direction TB
+    Coupon[\"`**Coupon code**
+    *lean-l · markdown label*`"\] -. applies .-> Cart(["Cart<br/><small>stadium · start</small>"])
+    Cart --->|Checkout| Paid{"Paid?<br/><small>rhombus · decision</small>"}
+    Paid e1@==>|Yes| Confirm[["Confirm order #35;1042<br/><small>subroutine</small>"]]
+    Paid -.->|"`**No** · *retry later*`"| Retry("Retry payment<br/><small>round</small>")
+    Retry e2@-..-> Cart
+    Retry --x Cancel>"Cancel<br/><small>asymmetric · --x stops</small>"]
+    Cancel -.- Coupon
+    Confirm --> Mail[/"Receipt email<br/><small>lean-r · output</small>"/] & Ship{{"Ship<br/><small>hexagon · prepare</small>"}}
+    Confirm == reserves ==> Stock[("Stock<br/><small>cylinder · bracket form of cyl</small>")]
+    Cancel x--x Stock
+    Stock ---|on hand| Pick[/"Pick items<br/><small>trapezoid</small>"\]
+    Pick -- boxes ----> Pack[\"Pack box<br/><small>trapezoid alt</small>"/]
+    Pack === Ship
+    Ship <--> Track(("Track #quot;in transit#quot;<br/><small>circle</small>"))
+    Ship --o Done((("Delivered<br/><small>double circle · end</small>")))
+    Track o--o Done
+    Mail ~~~ Track
+    Note@{ shape: braces, label: "Comment<br/><small>braces · annotation</small>" }
+    Note -- explains --- Paid
+  end
+
   Focus --> API
+  Edges -.->|runs on| Infra
+  e1@{ curve: stepBefore, animation: slow }
+  e2@{ animate: true }
+  linkStyle 0 stroke-width:2px
+  click Paid href "https://docs.mermaidchart.com" "Payment rules" _blank
 
   classDef em fill:#173d25,stroke:#86efac
   classDef issue fill:#422323,stroke:#fca5a5
-  classDef legacy opacity:0.5,stroke-dasharray:4 3
+  classDef inactive opacity:0.5,stroke-dasharray:4 3
   classDef db fill:#1c2f4a,stroke:#93c5fd
   classDef cache fill:#163a40,stroke:#67e8f9
   classDef queue fill:#2e2650,stroke:#c4b5fd
   classDef file fill:#3d3415,stroke:#fcd34d
   classDef ext fill:#40291a,stroke:#fdba74
-  class Focus em
-  class Defect issue
-  class Old legacy
-  class DB,Vol db
+  class Focus,Confirm em
+  class Old inactive
+  class DB,Stock db
   class Cache,Mem cache
   class Queue queue
-  class Conf,Logs file
+  class Conf,Logs,Vol file
   class SaaS ext

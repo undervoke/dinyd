@@ -1,5 +1,5 @@
 ---
-title: Example · state transitions
+title: Example · Order lifecycle
 config:
   look: handDrawn
   handDrawnSeed: 5
@@ -8,26 +8,72 @@ config:
     mainBkg: "#333333"
     edgeLabelBackground: "#1f1f1f"
     noteBkgColor: "#333333"
+    altBackground: "#242424"
   themeCSS: |
     small { color: #b3b3b3; display: inline-block; text-align: left; }
+    /* hand-drawn parallel regions hardcode a lightgrey hatch in 11.16; the rule is inert in Mermaid 12 */
+    .statediagram-cluster-alt [stroke="lightgrey"] { stroke: #2a2a2a; }
 ---
-%% Owning document: <domain>.md.
+%% Transition label is free text, written `event [guard]` by convention; composite `state X { }` groups a sub-lifecycle; `--` splits parallel regions.
+%% Pseudo-states: `<<choice>>` branches on a guard, `<<fork>>`/`<<join>>` split and merge flat states.
+%% `accTitle` / `accDescr` summarize the diagram for screen readers.
+%% `state "Label" as id or `id : Label` names a state; apply a class with `class id name` or `id:::name`.
 stateDiagram-v2
   direction LR
-  state "Idle" as Idle
-  state "Running<br/><small>the key state is em</small>" as Running
-  state "Done" as Done
+  state "Draft" as Draft
+  state "Paying<br/><small>composite · sub-lifecycle of one step</small>" as Paying {
+    state "Authorizing" as Authorizing
+    state "Captured" as Captured
+    [*] --> Authorizing
+    Authorizing --> Captured : approved
+  }
+  state stock_check <<choice>>
+  state "Fulfilling<br/><small>parallel regions · both must finish</small>" as Fulfilling {
+    state "Packing" as Packing
+    state "Packed" as Packed
+    [*] --> Packing
+    Packing --> Packed
+    --
+    state "Invoicing" as Invoicing
+    state "Invoiced" as Invoiced
+    [*] --> Invoicing
+    Invoicing --> Invoiced
+  }
+  state "Shipped<br/><small>focus state · em</small>" as Shipped
+  state "Payment failed<br/><small>observed defect · issue</small>" as Failed
+  state "Back-ordered<br/><small>superseded path · legacy</small>" as BackOrdered
 
-  [*] --> Idle
-  Idle --> Running : request accepted
-  Running --> Done : success
-  Running --> Idle : failure<br/>[retryable]
-  Done --> [*]
+  [*] --> Draft
+  Draft --> stock_check : submit
+  stock_check --> Paying : [in stock]
+  stock_check --> BackOrdered : [out of stock]
+  Paying --> Fulfilling : captured
+  Paying --> Failed : declined<br/>[retries exhausted]
+  Failed --> Draft : edit card
+  state hand_over <<fork>>
+  state arrived <<join>>
+  Fulfilling --> hand_over : handed to courier
+  hand_over --> InTransit
+  hand_over --> Notified
+  InTransit : In transit
+  Notified : Tracking email sent
+  InTransit --> arrived
+  Notified --> arrived
+  arrived --> Shipped
+  Shipped --> [*]
+  Draft --> Cancelled:::inactive : abandon
+  Cancelled : Cancelled<br/><small>superseded path · legacy</small>
+  Cancelled --> [*]
 
-  note right of Running
-    • one bullet per statement
-    • notes follow the same rule
+  note right of stock_check
+    • choice · branch on a guard
+    • every outgoing edge names its guard
   end note
+  note left of Draft : one-line note
 
   classDef em fill:#173d25,stroke:#86efac
-  class Running em
+  classDef issue fill:#422323,stroke:#fca5a5
+  classDef inactive opacity:0.5,stroke-dasharray:4 3
+  class Shipped em
+  class Failed issue
+  class BackOrdered inactive

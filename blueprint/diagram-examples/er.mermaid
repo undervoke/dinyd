@@ -1,19 +1,53 @@
 ---
-title: Example · table relationships
+title: Example · Order schema
 config:
   look: handDrawn
   handDrawnSeed: 5
   theme: dark
+  themeVariables:
+    mainBkg: "#333333"
+    rowOdd: "#333333"
+    rowEven: "#2a2a2a"
 ---
-%% Owning document: <domain>.md.
-%% Attribute columns are fixed to type, name, key (`PK`/`FK`/`UK`), comment; the comment reads `description · e.g. value`.
+%% Attribute columns are fixed to type, name, key (`PK`/`FK`/`UK`), comment; the comment reads `description · e.g. value` (`설명 · 예: 값` in Korean text).
+%% Cardinality, left end · right end: `||` exactly one · `|o` · `o|` zero or one · `}|` · `|{` one or more · `}o` · `o{` zero or more; word forms such as `one or zero`, `one or more`, `zero or many`, `1`, `0+` also work.
+%% `subgraph Name … end` groups entities only in Mermaid 12; 11.16 draws `subgraph`, the name and `end` as extra entities.
+%% `--` identifying (child key includes the parent's) · `..` non-identifying; word forms read `only one to zero or more` (`to` identifying) and `many(0) optionally to 1+` (`optionally to` non-identifying, dashed).
+%% A `type?` marks a nullable column, `type[]` an array, `type(99)` a length; `name["Label"]` aliases an entity; `direction LR` and `class`/`:::` work as in flowcharts.
 erDiagram
-  sessions {
-    TEXT id PK "session identifier · e.g. ses_8f3a"
-    TEXT lifecycle_state "lifecycle state · e.g. open, closed"
+  direction LR
+  customers {
+    TEXT id PK "Customer identifier · e.g. cus_41f2"
+    TEXT email UK "Login address · e.g. ana@example.com"
   }
-  operations {
-    TEXT id PK "request identifier · e.g. op_2b71"
-    TEXT session_id FK "owning session · e.g. ses_8f3a"
+  orders {
+    TEXT id PK "Order identifier · e.g. ord_8f3a"
+    TEXT customer_id FK "Buyer · e.g. cus_41f2"
+    TEXT status "Lifecycle state · e.g. paid, shipped"
+    TIMESTAMP? shipped_at "Hand-over time · e.g. 2026-05-01T09:30Z"
   }
-  sessions ||--o{ operations : "owns requests"
+  order_lines {
+    TEXT order_id PK, FK "Owning order · e.g. ord_8f3a"
+    INTEGER line_no PK "Position in the order · e.g. 1"
+    TEXT product_sku FK "Ordered product · e.g. SKU-1009"
+    INTEGER qty "Units · e.g. 2"
+  }
+  products {
+    TEXT sku PK "Stock keeping unit · e.g. SKU-1009"
+    INTEGER price_cents "Unit price · e.g. 1999"
+  }
+  payments {
+    TEXT id PK "Payment identifier · e.g. pay_77c0"
+    TEXT order_id FK, UK "Paid order · e.g. ord_8f3a"
+  }
+  coupons["coupons · campaign codes"] {
+    TEXT code PK "Redeemable code · e.g. SPRING10"
+  }
+  customers ||..o{ orders : "places"
+  orders ||--|{ order_lines : "contains"
+  products ||..o{ order_lines : "appears in"
+  orders ||..o| payments : "is paid by"
+  orders many(0) optionally to many(0) coupons : "redeems"
+
+  classDef em fill:#173d25,stroke:#86efac
+  class orders em
