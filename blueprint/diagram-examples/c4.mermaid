@@ -1,0 +1,47 @@
+---
+config:
+  look: handDrawn
+  handDrawnSeed: 5
+  theme: dark
+  themeCSS: |
+    /* C4 hardcodes #444444 for relation/boundary labels and lines */
+    text[fill="#444444"] { fill: #b3b3b3; }
+    [stroke="#444444"] { stroke: #b3b3b3; }
+  c4:
+    person_bg_color: "#333333"
+    person_border_color: "#b3b3b3"
+    system_bg_color: "#333333"
+    system_border_color: "#b3b3b3"
+    container_bg_color: "#333333"
+    container_border_color: "#b3b3b3"
+    container_db_bg_color: "#1c2f4a"
+    container_db_border_color: "#93c5fd"
+    container_queue_bg_color: "#2e2650"
+    container_queue_border_color: "#c4b5fd"
+    external_system_bg_color: "#40291a"
+    external_system_border_color: "#fdba74"
+---
+%% C4 ignores the frontmatter title; the title is a `title` line.
+%% Zoom level picks the keyword: C4Context systems and people (c4-context) · C4Container apps and stores in one system · C4Component parts of one container (c4-component) · C4Dynamic numbered steps (c4-dynamic) · C4Deployment runtime nodes (c4-deployment).
+%% Elements: `Person` · `System` · `Container` · `Component`; on System, Container and Component a `Db` or `Queue` suffix changes the shape and `_Ext` marks an outside owner, as in `SystemQueue_Ext`.
+%% Boundaries: `Enterprise_Boundary` (organisation) · `System_Boundary` (one system) · `Container_Boundary` (one container) · `Boundary(id, label, type)`.
+%% `Rel(from, to, "what", "technology")` with one technology each; `BiRel` two-way, `Rel_Back` points to → from; `Rel_U/D/L/R` are accepted C4-PlantUML aliases, but neither preview moves elements by them.
+%% Layout follows statement order, so declare neighbours next to each other; tune it with `UpdateLayoutConfig` and move a label with `UpdateRelStyle(from, to, $offsetX, $offsetY)`.
+C4Container
+  title Example · Online store containers
+  Person(customer, "Customer", "Person · who uses the system")
+  System_Boundary(store, "Online store") {
+    Container(web, "Web app", "React", "Container · runs code")
+    Container(api, "Order API", "Go", "Container · owns order rules")
+    ContainerDb(db, "Order database", "PostgreSQL", "ContainerDb · persistent store")
+    ContainerQueue(events, "Order events", "Kafka", "ContainerQueue · asynchronous handoff")
+  }
+  System_Ext(payments, "Payment provider", "System_Ext · owned by someone else")
+
+  Rel(customer, web, "Places orders", "HTTPS")
+  Rel(web, api, "Calls", "JSON over HTTPS")
+  Rel_D(api, db, "Reads and writes", "SQL")
+  Rel(api, events, "Publishes OrderPaid", "Kafka")
+  BiRel(api, payments, "Charges cards · confirms", "HTTPS")
+  UpdateRelStyle(web, api, $offsetY="-25")
+  UpdateLayoutConfig($c4ShapeInRow="4", $c4BoundaryInRow="1")

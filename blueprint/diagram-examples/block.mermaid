@@ -1,0 +1,44 @@
+---
+title: Example · Store platform layers
+config:
+  look: handDrawn
+  handDrawnSeed: 5
+  theme: dark
+  themeVariables:
+    mainBkg: "#333333"
+    clusterBkg: "#242424"
+  themeCSS: |
+    /* hand-drawn block arrows skip the node fill rule */
+    .rough-node polygon { fill: #333333; stroke: #b3b3b3; }
+---
+%% `columns N` sets the grid (omitted means one row, `auto`); `id:N` spans N columns; `space` or `space:N` leaves cells empty, which also gives edges room.
+%% `block:id:N … end` nests a sub-grid; choose block when grid position carries meaning, flowchart when only links do.
+%% Shapes use flowchart brackets (`( )` `([ ])` `[[ ]]` `[( )]` `(( ))` `> ]` `{ }` `{{ }}` `[/ /]` `[\ \]` `[/ \]` `[\ /]` `((( )))`); `id<["label"]>(down)` is a block arrow, also `up` `left` `right` `x` `y` and pairs such as `(x, down)`.
+%% Links: `-->` arrow · `---` plain · `-- "text" -->` labelled.
+block
+  columns 3
+  web(["Web app"]) space mobile(["Mobile app"])
+  space:3
+  gateway{{"API gateway · spans 3 columns"}}:3
+  space routes<["routes to services"]>(down) space
+  block:services:3
+    columns 3
+    orders["Order service"] payments["Payment service"] stock["Inventory service"]
+  end
+  space:3
+  ordersDb[("Order DB")] queue[["Event queue"]] cache[("Stock cache")]
+
+  web --> gateway
+  mobile --> gateway
+  orders --> ordersDb
+  payments -- "publishes" --> queue
+  stock --- cache
+
+  classDef em fill:#173d25,stroke:#86efac
+  classDef db fill:#1c2f4a,stroke:#93c5fd
+  classDef cache fill:#163a40,stroke:#67e8f9
+  classDef queue fill:#2e2650,stroke:#c4b5fd
+  class orders em
+  class ordersDb db
+  class cache cache
+  class queue queue

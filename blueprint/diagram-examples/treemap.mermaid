@@ -1,0 +1,32 @@
+---
+title: Example · Revenue by channel and category
+config:
+  look: classic
+  theme: dark
+  themeVariables:
+    cScale0: "#333333"
+    cScale1: "#1c2f4a"
+    cScale2: "#2e2650"
+    cScale3: "#3d3415"
+    cScaleLabel0: "#e0e0e0"
+    cScaleLabel1: "#e0e0e0"
+    cScaleLabel2: "#e0e0e0"
+    cScaleLabel3: "#e0e0e0"
+  treemap:
+    valueFormat: "$0,0"
+---
+%% Quoted names nest by indentation; a leaf `"Name": value` sets its area, a section sums its leaves.
+%% Area compares sizes within one whole; `:::em` with `classDef` marks the leaf under discussion; `config.treemap`: `padding` · `diagramPadding` · `showValues` · `nodeWidth` · `borderWidth` · `labelFontSize` · `valueFormat`.
+treemap-beta
+"Web"
+  "Electronics": 4200
+  "Home": 2600:::em
+  "Fashion": 1300
+"Mobile app"
+  "Electronics": 3100
+  "Fashion": 1500
+"Marketplace"
+  "Books": 900
+  "Toys": 700
+
+classDef em fill:#173d25,stroke:#86efac

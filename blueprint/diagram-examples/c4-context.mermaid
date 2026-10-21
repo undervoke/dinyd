@@ -1,0 +1,44 @@
+---
+config:
+  look: handDrawn
+  handDrawnSeed: 5
+  theme: dark
+  themeCSS: |
+    /* C4 hardcodes #444444 for relation/boundary labels and lines */
+    text[fill="#444444"] { fill: #b3b3b3; }
+    [stroke="#444444"] { stroke: #b3b3b3; }
+  c4:
+    person_bg_color: "#333333"
+    person_border_color: "#b3b3b3"
+    external_person_bg_color: "#40291a"
+    external_person_border_color: "#fdba74"
+    system_bg_color: "#333333"
+    system_border_color: "#b3b3b3"
+    external_system_bg_color: "#40291a"
+    external_system_border_color: "#fdba74"
+    external_system_queue_bg_color: "#40291a"
+    external_system_queue_border_color: "#fdba74"
+---
+%% C4Context shows whole systems and the people around them; open one system with C4Container (c4).
+%% `Enterprise_Boundary` frames the systems one organisation owns; everything `_Ext` sits outside it.
+C4Context
+  title Example · Online store in context
+  Person(customer, "Customer", "Person · buys from the store")
+  System_Ext(payments, "Payment provider", "System_Ext · owned by someone else")
+  Enterprise_Boundary(company, "Store company") {
+    System(store, "Online store", "System · the system in focus")
+    System(wms, "Warehouse system", "System · another system we own")
+  }
+  Boundary(carrier, "Carrier", "partner") {
+    SystemQueue_Ext(tracking, "Carrier tracking feed", "SystemQueue_Ext · their event stream")
+    Person_Ext(courier, "Courier", "Person_Ext · outside the organisation")
+  }
+
+  Rel(customer, store, "Places orders", "HTTPS")
+  Rel(store, payments, "Charges cards", "HTTPS")
+  BiRel(store, wms, "Syncs stock", "gRPC")
+  Rel_Back(store, tracking, "Pushes scan events", "Webhook")
+  Rel(courier, tracking, "Scans parcels", "Handheld app")
+  UpdateRelStyle(customer, store, $offsetY="-50")
+  UpdateRelStyle(store, tracking, $offsetX="-40", $offsetY="-30")
+  UpdateLayoutConfig($c4ShapeInRow="2", $c4BoundaryInRow="2")

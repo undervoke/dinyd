@@ -1,0 +1,27 @@
+---
+title: Example · Store repository layout
+config:
+  look: classic
+  theme: dark
+---
+%% Indentation sets the depth; a trailing `/` marks a directory and renders it bold, and a quoted label carries spaces.
+%% Box-drawing characters (`├──` `└──` `│`) draw the same tree without indentation.
+%% `showIcons` in the config turns the default file and folder icons on; `icon(none)` hides the icon of one node.
+%% The tree holds no edges, so the order of the lines is the structure and the focus is the path itself.
+treeView-beta
+  storefront/
+    apps/
+      web/
+        src/
+          checkout/
+            order.mjs
+            payment.mjs
+          pricing.mjs
+        package.json
+      worker/
+        fulfilment.mjs
+    services/
+      orders/
+        api.mjs
+    docs/
+      "order flow.md"

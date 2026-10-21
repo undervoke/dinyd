@@ -1,0 +1,40 @@
+---
+title: Example · Order fulfilment by team
+config:
+  look: handDrawn
+  handDrawnSeed: 5
+  theme: dark
+  themeVariables:
+    mainBkg: "#333333"
+    clusterBkg: "#242424"
+  flowchart:
+    titleTopMargin: 110
+  themeCSS: |
+    small { display: inline-block; text-align: left; }
+---
+%% Each top-level `subgraph id [Lane]` is an owner; a step sits in the lane of whoever performs it.
+%% Nodes and edges use flowchart syntax (`-->` `---` `-.->` `==>` `|label|`, chains); cross-lane edges are handoffs, so label the condition on each branch.
+%% Direction follows the keyword: `TB` (default) · `TD` · `BT` · `LR` · `RL`; `accTitle` / `accDescr` give screen readers a summary.
+%% `flowchart.titleTopMargin` lifts the frontmatter title above the lane headers.
+swimlane-beta LR
+  accTitle: Order fulfilment by team
+  accDescr: The customer places an order, the store checks stock and packs it, and the courier delivers it.
+  subgraph customer [Customer]
+    place(["Place order<br/><small>stadium · start</small>"])
+    notice(["Back-order notice<br/><small>stadium · end</small>"])
+  end
+  subgraph store [Store]
+    check{"In stock?<br/><small>diamond · decision</small>"}
+    pack["Pack order"]
+  end
+  subgraph courier [Courier]
+    ship["Ship parcel<br/><small>focus · em</small>"]
+    delivered(["Delivered"])
+  end
+  place --> check
+  check ==>|Yes| pack
+  check -.->|No| notice
+  pack --> ship --> delivered
+
+  classDef em fill:#173d25,stroke:#86efac
+  class ship em

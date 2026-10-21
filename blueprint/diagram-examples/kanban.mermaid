@@ -1,0 +1,36 @@
+---
+title: Example · Checkout board
+config:
+  look: classic
+  theme: dark
+  themeVariables:
+    cScale0: "#242424"
+    cScale1: "#242424"
+    cScale2: "#242424"
+    cScale3: "#242424"
+    cScale4: "#242424"
+    cScale5: "#242424"
+    cScale6: "#242424"
+    cScaleLabel0: "#e0e0e0"
+    cScaleLabel1: "#e0e0e0"
+    cScaleLabel2: "#e0e0e0"
+    cScaleLabel3: "#e0e0e0"
+    cScaleLabel4: "#e0e0e0"
+    cScaleLabel5: "#e0e0e0"
+    cScaleLabel6: "#e0e0e0"
+  kanban:
+    ticketBaseUrl: "https://tracker.example.com/browse/#TICKET#"
+---
+%% Top level `id[Column]` is a workflow state; indented `id[Card]` is a work item in it; a bare `Column` / `[Card]` without an id also works.
+%% Card metadata `@{ ticket, assigned, priority }`; priority is Very High · High · Low · Very Low; `ticketBaseUrl` links the ticket.
+kanban
+  backlog[Backlog]
+    saved[Saved carts]@{ ticket: SHOP-101, priority: 'Very Low' }
+  todo[To do]
+    tax[Tax per region]@{ ticket: SHOP-112, assigned: 'backend', priority: 'High' }
+  doing[In progress]
+    retry[Card retry flow]@{ ticket: SHOP-98, assigned: 'payments', priority: 'Very High' }
+  review[In review]
+    export[Order export]@{ ticket: SHOP-87, assigned: 'backend', priority: 'Low' }
+  done[Done]
+    filters[Search filters]@{ ticket: SHOP-75 }

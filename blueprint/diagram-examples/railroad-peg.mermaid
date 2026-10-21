@@ -1,0 +1,19 @@
+---
+title: Example · Coupon code
+config:
+  look: classic
+  theme: dark
+  railroad:
+    specialStroke: "#b3b3b3"
+---
+%% PEG: `a b` sequence · `a / b` ordered choice (first match wins) · `a?` `a*` `a+` · `&a` lookahead · `!a` negative lookahead · `.` any character · `( … )` group.
+%% Rules read `Name <- expression ;`; terminals are `"text"` or `'text'`. Predicates and `.` draw as dashed prose boxes; `#` starts a comment.
+railroad-peg-beta
+title "Example · Coupon code"
+Coupon <- !Retired Campaign Digit+ Tag? ;
+Campaign <- "SPRING" / "SUMMER" / "VIP" ;
+# a retired campaign code
+Retired <- "VIP0" ;
+Tag <- "-" &Letter ( !Digit . )+ ;
+Letter <- "A" / "B" / "C" ;
+Digit <- "0" / "1" / "2" / "3" / "4" / "5" / "6" / "7" / "8" / "9" ;

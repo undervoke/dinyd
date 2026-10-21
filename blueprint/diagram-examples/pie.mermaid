@@ -1,0 +1,27 @@
+---
+title: Example · Orders by channel
+config:
+  look: classic
+  theme: dark
+  themeVariables:
+    pie1: "#93c5fd"
+    pie2: "#c4b5fd"
+    pie3: "#fcd34d"
+    pie4: "#67e8f9"
+    pieSectionTextColor: "#1f1f1f"
+    pieLegendTextColor: "#e0e0e0"
+    pieTitleTextColor: "#e0e0e0"
+    pieStrokeColor: "#1f1f1f"
+    pieOuterStrokeColor: "#1f1f1f"
+  pie:
+    donutHole: 0.4
+---
+%% Pie shows parts of one whole; `pie.donutHole` cuts the centre out.
+%% Slices keep source order, so list them largest first; `showData` adds raw values to the legend.
+%% A body `title …` line is the alternative to frontmatter `title`.
+%% `config.pie`: `textPosition` · `donutHole` · `legendPosition` · `highlightSlice`.
+pie showData
+  "Web" : 48
+  "Mobile app" : 31
+  "Marketplace" : 14
+  "Phone" : 7

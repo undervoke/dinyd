@@ -1,0 +1,40 @@
+---
+title: Example · Checkout scope
+config:
+  look: handDrawn
+  handDrawnSeed: 5
+  theme: dark
+  themeVariables:
+    cScale0: "#333333"
+    cScale1: "#1c2f4a"
+    cScale2: "#2e2650"
+    cScale3: "#3d3415"
+    cScale4: "#163a40"
+    cScale5: "#40291a"
+    cScaleLabel0: "#e0e0e0"
+    cScaleLabel1: "#e0e0e0"
+    cScaleLabel2: "#e0e0e0"
+    cScaleLabel3: "#e0e0e0"
+    cScaleLabel4: "#e0e0e0"
+    cScaleLabel5: "#e0e0e0"
+---
+%% Indentation sets depth; each top-level branch takes the next palette color.
+%% Shapes: `((circle))` root · `[square]` · `(rounded)` · `{{hexagon}}` · `)cloud(` · `))bang((` · bare text; depth, not color, carries meaning.
+%% A label in "` `" is a markdown string (`**bold**`, `*italic*`), wrapped automatically.
+%% `::icon(fa fa-…)` on the next line draws a `?` placeholder in 11.16 and nothing in Mermaid 12, and `:::name` needs page CSS that neither preview defines, so neither carries meaning here.
+%% `config: { layout: tidy-tree }` needs a separately registered layout that neither preview ships, so the default layout is used.
+mindmap
+  root((Checkout))
+    cart[Cart · square]
+      Saved carts
+      Promo codes
+    pay(Payment · rounded)
+      Cards
+      Wallets
+      fraud["`**Fraud check** before *capture*`"]
+    ship{{Shipping · hexagon}}
+      Rates
+      Tracking
+    risks)Open questions · cloud(
+      Tax per region
+    launch))Launch · bang((

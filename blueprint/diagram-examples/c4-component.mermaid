@@ -1,0 +1,42 @@
+---
+config:
+  look: handDrawn
+  handDrawnSeed: 5
+  theme: dark
+  themeCSS: |
+    /* C4 hardcodes #444444 for relation/boundary labels and lines */
+    text[fill="#444444"] { fill: #b3b3b3; }
+    [stroke="#444444"] { stroke: #b3b3b3; }
+  c4:
+    container_bg_color: "#333333"
+    container_border_color: "#b3b3b3"
+    container_db_bg_color: "#1c2f4a"
+    container_db_border_color: "#93c5fd"
+    component_bg_color: "#333333"
+    component_border_color: "#b3b3b3"
+    component_db_bg_color: "#1c2f4a"
+    component_db_border_color: "#93c5fd"
+    component_queue_bg_color: "#2e2650"
+    component_queue_border_color: "#c4b5fd"
+    external_component_bg_color: "#40291a"
+    external_component_border_color: "#fdba74"
+---
+%% C4Component opens one container; the frame is `Container_Boundary` and neighbours stay `Container`s outside it.
+%% `Component`, `ComponentDb`, `ComponentQueue` and their `_Ext` forms take (id, label, technology, description), like `Container`.
+C4Component
+  title Example · Order API components
+  Container(web, "Web app", "React", "Container · caller outside the frame")
+  Container_Boundary(api, "Order API") {
+    Component(checkout, "Checkout handler", "Go HTTP handler", "Component · entry point")
+    ComponentQueue(outbox, "Outbox", "Go worker", "ComponentQueue · durable event relay")
+    Component_Ext(fraud, "Fraud scoring SDK", "Vendor library", "Component_Ext · third-party code")
+    ComponentDb(ledger, "Order ledger", "Embedded SQLite", "ComponentDb · store inside the container")
+  }
+  ContainerDb(db, "Order database", "PostgreSQL", "ContainerDb · outside the frame")
+
+  Rel(web, checkout, "Submits cart", "JSON over HTTPS")
+  Rel(checkout, ledger, "Records order")
+  Rel(checkout, fraud, "Scores order")
+  Rel(checkout, outbox, "Enqueues OrderPaid")
+  Rel(outbox, db, "Writes events", "SQL")
+  UpdateRelStyle(checkout, outbox, $offsetX="-10", $offsetY="-30")

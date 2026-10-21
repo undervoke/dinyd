@@ -1,0 +1,36 @@
+---
+title: Example · Store deployment
+config:
+  look: classic
+  theme: dark
+  architecture:
+    seed: 7
+---
+%% `group id(icon)[Title] in parent` nests boundaries; `service id(icon)[Title] in group` places a node; icons: cloud, database, disk, internet, server; `pack:name` icons appear in architecture-icons.
+%% Labels sit under the icons, so this example keeps edges off a service's bottom port `:B` and routes vertical links through a `junction`.
+%% Edges: `a:R -- L:b` plain · `-->` one way · `<-->` both ways; `a{group}:R --> B:b{group}` leaves and enters the groups instead of the services.
+%% `align row` / `align column` pin siblings the layout would otherwise stack.
+architecture-beta
+  service users(internet)[Customers]
+  group cloud(cloud)[Cloud account]
+  group app(server)[App tier] in cloud
+  service lb(server)[Load balancer] in cloud
+  service api(server)[Order API] in app
+  junction fanout in app
+  service worker(server)[Payment worker] in app
+  service db(database)[Order DB] in cloud
+  service files(disk)[Invoice files] in cloud
+  group backup(cloud)[Backup region]
+  service replica(database)[DB replica] in backup
+
+  users:R --> L:lb
+  lb:R --> L:api
+  api:R -- L:fanout
+  fanout:R <--> L:db
+  fanout:B --> T:worker
+  worker:R --> L:files
+  db{group}:R --> B:replica{group}
+  align row users lb api fanout db
+  align row worker files
+  align column fanout worker
+  align column db files

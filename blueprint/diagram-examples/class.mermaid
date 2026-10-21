@@ -1,0 +1,85 @@
+---
+title: Example · Order domain model
+config:
+  look: handDrawn
+  handDrawnSeed: 5
+  theme: dark
+  layout: dagre
+  themeVariables:
+    mainBkg: "#333333"
+    edgeLabelBackground: "#1f1f1f"
+    clusterBkg: "#242424"
+---
+%% Members: `+` public · `-` private · `#` protected · `~` internal; trailing `$` static, `*` abstract; `Type~T~` generic, referenced as `Type`; `Class : +member()` adds a member outside the body.
+%% Annotations: `<<interface>>` · `<<abstract>>` · `<<enumeration>>` · `<<service>>`, inside the body or as `<<service>> Name`.
+%% Relations: `<|--` inheritance · `*--` composition · `o--` aggregation · `-->` association · `--` link · `..>` dependency · `..|>` realization · `..` dashed link; heads on both ends (`<|--|>`, `<-->`) make it two-way; `()--` lollipop interface; quoted ends carry multiplicity.
+%% `namespace Id["Label"] { }` groups classes, `A.B` or a nested `namespace` block nests; `class X <<interface>>` annotates inline; `class Id["Label"]` gives a class a display label; `note` / `note for X`; `click X href "url"`.
+%% Label every relation `kind · meaning here` so the arrow choice is checkable.
+classDiagram
+  direction LR
+  namespace Ordering["Ordering · bounded context"] {
+    class Order:::em {
+      +string id
+      -Money total
+      #OrderStatus status
+      +addLine(Product product, int qty) void
+      +submit() Result~Receipt~
+      +fromCart(Cart cart) Order$
+    }
+    class OrderLine {
+      +int qty
+      +subtotal() Money
+    }
+    class OrderStatus {
+      <<enumeration>>
+      DRAFT
+      PAID
+      SHIPPED
+    }
+    class Cart~T~ {
+      ~List~T~ items
+    }
+  }
+  namespace Ordering.Pricing {
+    class Discount {
+      <<abstract>>
+      +apply(Money total) Money*
+    }
+    class PercentOff {
+      +int percent
+    }
+  }
+  namespace Payments {
+    class PaymentMethod {
+      <<interface>>
+      +charge(Money amount) Result~Receipt~*
+    }
+    class CardPayment {
+      -string token
+    }
+  }
+  class Product["Product · catalog item"] {
+    +string sku
+    +Money price
+  }
+  class Customer {
+    +string email
+  }
+  class Warehouse
+  <<service>> Warehouse
+
+  Customer "1" --> "0..*" Order : association · places
+  Order "1" *-- "1..*" OrderLine : composition · lines end with the order
+  OrderLine "0..*" o-- "1" Product : aggregation · product outlives the line
+  Order ..> PaymentMethod : dependency · used only in submit
+  PaymentMethod <|.. CardPayment : realization · implements
+  Discount <|-- PercentOff : inheritance · is a
+  Order "1" --> "0..1" Discount : association · applies
+  Order .. OrderStatus : dashed link · typed by
+  Cart -- Customer : link · belongs to
+  Warehouse --() StockQuery : lollipop · provided interface
+  note for Order "em · the class this diagram explains"
+  note "Domain model for checkout"
+  click Product href "https://example.com/catalog" "Catalog docs"
+
+  classDef em fill:#173d25,stroke:#86efac

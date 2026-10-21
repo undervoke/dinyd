@@ -1,0 +1,15 @@
+---
+title: Example · Order reference
+config:
+  look: classic
+  theme: dark
+---
+%% ABNF (RFC 5234): `a b` sequence · `a / b` choice · `[ a ]` optional · `*a` zero or more · `1*a` one or more · `( … )` group; counted `4a` and `2*4a` parse but draw as plain one-or-more loops, so spell exact counts out.
+%% Terminals are `"text"` or numeric `%x41`, `%d65`, `%b1000001`, ranges `%x30-39`; core rules such as `DIGIT` and `ALPHA` are plain names; `; text` on its own line is a comment.
+railroad-abnf-beta
+title "Example · Order reference"
+order-ref = "ORD" %x2D year %x2D region [ %x2D suffix ] ;
+; the year has exactly four digits
+year = DIGIT DIGIT DIGIT DIGIT ;
+region = ALPHA ALPHA [ ALPHA ] ;
+suffix = 1*( DIGIT / %x41-5A ) ;

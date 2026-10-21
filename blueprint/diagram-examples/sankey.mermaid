@@ -1,0 +1,26 @@
+---
+title: Example · Checkout funnel
+config:
+  look: classic
+  theme: dark
+  themeCSS: |
+    /* inline multiply blending hides links on a dark background */
+    .link { mix-blend-mode: normal !important; }
+  sankey:
+    showValues: true
+    nodeAlignment: justify
+---
+%% The sankey lexer accepts only printable ASCII, so node names stay English.
+%% One `source,target,value` row per flow; outflows of a node should sum to its inflow. Quote a name that holds a comma; blank lines may separate stages.
+%% `sankey.linkColor`: gradient (default) · source · target · a hex color such as `#a1a1a1`; `nodeAlignment`: justify · center · left · right; `labelStyle: outlined` draws labels outside the nodes with an outline; `nodeWidth` · `nodePadding` · `width` · `height` size it; `""` escapes a quote inside a quoted name.
+%% Nodes take the dark theme's categorical palette and links blend source into target; `sankey.nodeColors` maps a node name to a hex color.
+sankey
+Visit,Product page,1000
+Product page,Cart,420
+Product page,Left site,580
+
+Cart,Checkout,300
+Cart,Abandoned cart,120
+
+Checkout,Paid,270
+Checkout,Payment failed,30

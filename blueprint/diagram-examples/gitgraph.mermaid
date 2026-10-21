@@ -1,0 +1,43 @@
+---
+title: Example · Branching for a release
+config:
+  look: classic
+  theme: dark
+  themeVariables:
+    git0: "#8a8a8a"
+    git1: "#93c5fd"
+    git2: "#c4b5fd"
+    git3: "#fcd34d"
+    gitBranchLabel0: "#1f1f1f"
+    gitBranchLabel1: "#1f1f1f"
+    gitBranchLabel2: "#1f1f1f"
+    gitBranchLabel3: "#1f1f1f"
+    commitLabelColor: "#e0e0e0"
+    commitLabelBackground: "#333333"
+    tagLabelColor: "#1f1f1f"
+    tagLabelBackground: "#e0e0e0"
+    tagLabelBorder: "#e0e0e0"
+---
+%% Commit types: NORMAL default · HIGHLIGHT the commit the diagram explains · REVERSE a reverted commit; `id:`, `type:`, `tag:` also apply to `merge`.
+%% `cherry-pick id:` copies one commit from another branch (add `parent:` when it is a merge); `tag:` marks a release.
+%% `branch name order: n` fixes lane order; the header takes `LR:` (default), `TB:` or `BT:`.
+%% Config `gitGraph.mainBranchName`, `showBranches`, `showCommitLabel`, `rotateCommitLabel`, `parallelCommits` shape the layout.
+gitGraph LR:
+  commit id: "init"
+  commit id: "cart"
+  branch release/1.0 order: 3
+  checkout main
+  branch feature/checkout order: 1
+  commit id: "form"
+  commit id: "coupon" type: REVERSE
+  checkout main
+  commit id: "tax fix" type: HIGHLIGHT
+  checkout release/1.0
+  cherry-pick id: "tax fix" tag: "v1.0.1"
+  checkout main
+  commit id: "rates"
+  branch hotfix/rounding order: 2
+  commit id: "round half up"
+  checkout main
+  merge hotfix/rounding id: "merge rounding"
+  merge feature/checkout id: "merge checkout" tag: "v1.1.0"

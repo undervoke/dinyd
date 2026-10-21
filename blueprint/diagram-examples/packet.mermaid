@@ -1,0 +1,29 @@
+---
+title: Example · TCP header
+config:
+  look: classic
+  theme: dark
+---
+%% `start-end: "label"` for a bit range, `bit: "label"` for one bit, `+N: "label"` for the next N bits; fields must be contiguous from 0.
+%% Rows wrap every `packet.bitsPerRow` bits (default 32), so a 32-bit field fills one row.
+%% A body `title …` line is the alternative to frontmatter `title`.
+packet
+  0-15: "Source port"
+  16-31: "Destination port"
+  32-63: "Sequence number"
+  64-95: "Acknowledgment number"
+  96-99: "Data offset"
+  100-102: "Reserved"
+  103: "NS"
+  +1: "CWR"
+  +1: "ECE"
+  +1: "URG"
+  +1: "ACK"
+  +1: "PSH"
+  +1: "RST"
+  +1: "SYN"
+  +1: "FIN"
+  +16: "Window size"
+  128-143: "Checksum"
+  144-159: "Urgent pointer"
+  160-191: "Options (variable length)"

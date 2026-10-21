@@ -1,0 +1,34 @@
+---
+config:
+  look: handDrawn
+  handDrawnSeed: 5
+  theme: dark
+  themeCSS: |
+    /* C4 hardcodes #444444 for relation/boundary labels and lines */
+    text[fill="#444444"] { fill: #b3b3b3; }
+    [stroke="#444444"] { stroke: #b3b3b3; }
+  c4:
+    person_bg_color: "#333333"
+    person_border_color: "#b3b3b3"
+    container_bg_color: "#333333"
+    container_border_color: "#b3b3b3"
+    container_db_bg_color: "#1c2f4a"
+    container_db_border_color: "#93c5fd"
+    external_system_bg_color: "#40291a"
+    external_system_border_color: "#fdba74"
+---
+%% C4Dynamic numbers relations in statement order; `RelIndex(n, from, to, "what")` reads like C4-PlantUML but its index is ignored.
+%% Use it for one runtime scenario across elements of a container or context view.
+C4Dynamic
+  title Example · Checkout, step by step
+  Person(customer, "Customer")
+  Container(web, "Web app", "React")
+  Container(api, "Order API", "Go")
+  ContainerDb(db, "Order database", "PostgreSQL")
+  System_Ext(payments, "Payment provider")
+
+  Rel(customer, web, "Clicks Pay")
+  Rel(web, api, "POST /orders", "JSON over HTTPS")
+  RelIndex(9, api, payments, "Charges card")
+  Rel(api, db, "Stores paid order", "SQL")
+  UpdateRelStyle(api, db, $offsetX="-40", $offsetY="-30")

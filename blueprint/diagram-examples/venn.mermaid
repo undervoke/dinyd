@@ -1,0 +1,23 @@
+---
+title: Example · Where buyers shop
+config:
+  look: handDrawn
+  handDrawnSeed: 5
+  theme: dark
+  themeVariables:
+    venn1: "#93c5fd"
+    venn2: "#c4b5fd"
+    venn3: "#fcd34d"
+---
+%% `set id["Label"]:size` declares a set; `union a,b["Label"]:size` labels an overlap of earlier sets.
+%% `:size` sets the circle size; indented `text id["…"]` lines place members inside the latest set or union. Identifiers may be bare words or quoted strings.
+%% A body `title …` line is the alternative to frontmatter `title`.
+venn-beta
+  set web["Web"]:40
+    text w1["Desktop checkout"]
+  set app["Mobile app"]:30
+    text a1["Push offers"]
+  set market["Marketplace"]:20
+  union web,app["Cross-device"]:12
+    text x1["Saved carts"]
+  union web,app,market["All three"]:3

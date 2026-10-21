@@ -1,0 +1,64 @@
+---
+title: Example · Checkout release plan
+config:
+  look: classic
+  theme: dark
+  gantt:
+    useWidth: 1800
+  themeVariables:
+    sectionBkgColor: "#6b6b6b"
+    sectionBkgColor2: "#6b6b6b"
+    altSectionBkgColor: "#1f1f1f"
+    gridColor: "#3a3a3a"
+    excludeBkgColor: "#5a4c1c"
+    taskBkgColor: "#333333"
+    taskBorderColor: "#b3b3b3"
+    taskTextColor: "#e0e0e0"
+    taskTextLightColor: "#e0e0e0"
+    taskTextDarkColor: "#e0e0e0"
+    taskTextOutsideColor: "#e0e0e0"
+    taskTextClickableColor: "#93c5fd"
+    vertLineColor: "#b3b3b3"
+    doneTaskBkgColor: "#242424"
+    doneTaskBorderColor: "#6b6b6b"
+    activeTaskBkgColor: "#173d25"
+    activeTaskBorderColor: "#86efac"
+    critBkgColor: "#4a4a4a"
+    critBorderColor: "#e0e0e0"
+---
+%% Tags before the id: `done` finished · `active` in progress (em) · `crit` on the critical path (lighter grey) · `milestone` a diamond at start + half its duration · `vert` a full-height date line; tags combine, as in `crit, done`.
+%% Start with a date or `after <id> <id>`; a task without a start follows the previous one; end with a duration (`3d`, `12h`), an end date, or `until <id>`, which runs past its target when excluded days fall inside it.
+%% Rows have a fixed height and the drawing fills the pane width, so `gantt.useWidth` widens the timeline; previews scale it down to fit, and zooming restores the text.
+%% Section bands draw at low opacity, so `sectionBkgColor` stays light grey to stay visible; `excludeBkgColor` takes an amber fill so excluded days read as gaps.
+%% `excludes` takes `weekends`, weekday names, or dates, and `weekend friday` shifts the weekend; `todayMarker off` hides the current-date line.
+%% `click <id> href "url"` links a task, `click <id> call fn()` calls a page function (both need the host's `securityLevel: loose`); `gantt.topAxis: true` repeats the date axis on top; frontmatter `displayMode: compact` packs a section's tasks into shared rows.
+%% A body `title …` line is the alternative to frontmatter `title`.
+gantt
+  dateFormat YYYY-MM-DD
+  axisFormat %m-%d
+  tickInterval 1week
+  weekday monday
+  excludes weekends
+  excludes 2026-03-17
+  excludes 2026-04-03
+  todayMarker off
+
+  section Plan
+    Requirements · done :done, req, 2026-02-23, 4d
+    Design review · done :done, design, after req, 2d
+  section Build
+    Schema migration · done :done, schema, after design, 3d
+    Checkout API · active :active, api, after schema, 5d
+    Payment integration · crit :crit, pay, after schema, 6d
+    Fraud rules · crit and done :crit, done, fraud, after design, 3d
+    Support training · until load test :support, 2026-03-09, until test
+  section Verify
+    Load test · waits for both :test, after api pay, 3d
+    Security review :sec, after pay, 4d
+    Acceptance test :uat, after test sec, 3d
+  section Release
+    Code freeze · milestone :milestone, freeze, after uat, 0d
+    Launch day :vert, launch, after freeze, 0d
+    Rollout :rollout, after freeze, 3d
+    Hypercare :hyper, after rollout, 5d
+  click api href "https://example.com/checkout-api"

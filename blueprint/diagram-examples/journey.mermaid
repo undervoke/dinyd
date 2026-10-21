@@ -1,0 +1,24 @@
+---
+title: Example · Buying a gift
+config:
+  look: classic
+  theme: dark
+  themeVariables:
+    fillType0: "#333333"
+    fillType1: "#333333"
+    fillType2: "#333333"
+---
+%% `Task: score: actors`; score 1 painful → 5 delighted, so low scores mark where to look.
+%% One section per stage of the journey; list every actor that takes part in the task.
+%% A body `title …` line is the alternative to frontmatter `title`.
+journey
+  section Discover
+    Search for a gift: 4: Customer
+    Compare prices: 3: Customer
+  section Buy
+    Add to cart: 5: Customer
+    Enter card details: 2: Customer, Payment provider
+    Get confirmation: 4: Customer, Store
+  section After purchase
+    Track delivery: 3: Customer, Courier
+    Return the item: 1: Customer, Support

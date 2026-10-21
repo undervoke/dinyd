@@ -1,0 +1,41 @@
+---
+config:
+  look: handDrawn
+  handDrawnSeed: 5
+  theme: dark
+  themeCSS: |
+    /* C4 hardcodes #444444 for relation/boundary labels and lines */
+    text[fill="#444444"] { fill: #b3b3b3; }
+    [stroke="#444444"] { stroke: #b3b3b3; }
+  c4:
+    container_bg_color: "#333333"
+    container_border_color: "#b3b3b3"
+    container_db_bg_color: "#1c2f4a"
+    container_db_border_color: "#93c5fd"
+    container_queue_bg_color: "#2e2650"
+    container_queue_border_color: "#c4b5fd"
+---
+%% C4Deployment nests `Deployment_Node(id, label, type, description)` boxes around the `Container`s they run; `Node` is its short form.
+%% `Node_L` and `Node_R` are accepted C4-PlantUML aliases of `Node`; neither preview aligns by them, so placement follows statement order.
+C4Deployment
+  title Example · Online store in production
+  Deployment_Node(cloud, "Cloud region", "eu-west-1") {
+    Deployment_Node(k8s, "Kubernetes cluster", "EKS 1.30") {
+      Node(web_pod, "Web pod", "3 replicas") {
+        Container(web, "Web app", "React SSR")
+      }
+      Node(api_pod, "API pod", "6 replicas") {
+        Container(api, "Order API", "Go")
+      }
+    }
+    Node_L(rds, "Managed database", "RDS Multi-AZ") {
+      ContainerDb(db, "Order database", "PostgreSQL 16")
+    }
+    Node_R(msk, "Managed stream", "MSK") {
+      ContainerQueue(events, "Order events", "Kafka")
+    }
+  }
+  Rel(web, api, "Calls", "HTTPS")
+  Rel(api, db, "Reads and writes", "SQL")
+  Rel(api, events, "Publishes", "Kafka")
+  UpdateLayoutConfig($c4ShapeInRow="2", $c4BoundaryInRow="2")

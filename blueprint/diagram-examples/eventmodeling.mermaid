@@ -1,0 +1,31 @@
+---
+title: Example · Cart to shipment
+config:
+  look: classic
+  theme: dark
+  themeCSS: |
+    /* box labels set no color and inherit the page's */
+    foreignObject span { color: #e0e0e0; }
+---
+%% `tf NN type Name` adds a time frame; types: `ui` screen · `cmd` command · `evt` event · `rmo` read model · `pcr` processor.
+%% Relations are inferred from order; `rf` starts a new chain, `->> NN` (repeatable) adds explicit sources, `Namespace.Name` gives each namespace and entity type its own lane.
+%% Data: inline `{ field: type }` or `[[Block]]` with a separate `data Block { … }`; a backticked type such as `` `json` `` may precede the braces.
+%% Long forms: `timeframe` for `tf`, `resetframe` for `rf`, and `command` · `event` · `readmodel` · `processor` for the short types.
+eventmodeling
+tf 01 ui CartScreen
+tf 02 cmd AddItem { sku: string, qty: number }
+tf 03 evt ItemAdded [[ItemAdded]]
+tf 04 rmo CartView ->> 03
+tf 05 ui CheckoutScreen
+tf 06 cmd PlaceOrder
+tf 07 evt OrderPlaced
+rf 08 evt Payments.PaymentCaptured
+tf 09 pcr FulfilmentProcessor
+tf 10 cmd ShipOrder
+tf 11 evt OrderShipped
+timeframe 12 readmodel OrderStatusView ->> 07 ->> 11 `json`{ "status": "shipped" }
+data ItemAdded {
+  sku: string
+  qty: number
+  price: number
+}

@@ -1,0 +1,41 @@
+---
+title: Example · Online store value chain
+config:
+  look: classic
+  theme: dark
+  themeVariables:
+    wardley:
+      linkStroke: "#b3b3b3"
+---
+%% Coordinates are `[visibility, evolution]`, both 0–1; this is the reverse of (x, y). `label [dx, dy]` after them nudges the name.
+%% The user need is the top `component`; `anchor` labels render black on the dark background in both previews. A component takes a decorator: `(build)` · `(buy)` · `(outsource)` · `(market)` · `(inertia)`.
+%% Links: `A -> B` dependency (`; text` labels it) · `A -.-> B` dashed · `A +> B` flow · `A +'text'> B` labelled flow · `+<` reverse · `+<>` both.
+%% `evolve X 0.8` draws planned movement; `pipeline X { … }` lists competing forms of one component; `evolution A -> B -> C -> D` renames the stages, `Stage / Alias` gives two labels and `Stage@0.4` sets a boundary; `A --> B` also links.
+%% The trend form `A -.- (x, y)` fails to parse in both previews.
+%% `accelerator` / `deaccelerator "Force" [v, e]` mark market forces; prefer `note` to `annotation N,[v, e] "text"` (listed by `annotations [v, e]`), whose key box renders white on white in both previews.
+%% A body `title …` line is the alternative to frontmatter `title`.
+wardley-beta
+evolution Genesis / Novel -> Custom / Emerging -> Product / Good -> Commodity / Utility
+component Shopper [0.95, 0.65]
+component Online store [0.82, 0.55] label [10, -6]
+component Checkout [0.68, 0.40] (build)
+component Search [0.62, 0.30] (inertia)
+component Payments [0.52, 0.78] (buy)
+component Order database [0.38, 0.62]
+component Hosting [0.20, 0.90] (market)
+
+Shopper -> Online store
+Online store -> Checkout
+Online store -.-> Search
+Checkout +'charge'> Payments
+Checkout -> Order database; owns orders
+Order database +> Hosting
+
+evolve Search 0.55
+pipeline Order database {
+  component "Self-managed" [0.45]
+  component "Managed service" [0.80]
+}
+accelerator "Managed databases" [0.30, 0.72]
+deaccelerator "Custom search tuning" [0.50, 0.18]
+note "Build what differentiates, buy the commodity" [0.12, 0.30]

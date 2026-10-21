@@ -1,0 +1,38 @@
+---
+title: Example · Checkout incident triage
+config:
+  look: classic
+  theme: dark
+  themeVariables:
+    cynefin:
+      complexBg: "#2e2650"
+      complicatedBg: "#1c2f4a"
+      clearBg: "#163a40"
+      chaoticBg: "#40291a"
+      confusionBg: "#3d3415"
+      boundaryColor: "#8a8a8a"
+      labelColor: "#e0e0e0"
+      textColor: "#e0e0e0"
+      arrowColor: "#e0e0e0"
+  cynefin:
+    seed: 3
+---
+%% Domains are fixed keywords with fixed positions; list each item under the domain whose response fits it.
+%% `from --> to : "reason"` records how an item moves once it is understood or breaks.
+%% A body `title …` line is the alternative to frontmatter `title`.
+%% `accTitle` / `accDescr` summarize it for screen readers; `config.cynefin`: `width` · `height` · `padding` · `showDomainDescriptions` · `boundaryAmplitude` · `seed`.
+cynefin-beta
+  complex
+    "Conversion drops after redesign"
+  complicated
+    "Slow queries at peak"
+    "Card declines from one bank"
+  clear
+    "Expired TLS certificate"
+  chaotic
+    "Payment provider outage"
+  confusion
+    "Intermittent 502s"
+
+  chaotic --> complex : "Stabilized"
+  complicated --> clear : "Runbook written"

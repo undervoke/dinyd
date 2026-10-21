@@ -1,0 +1,27 @@
+---
+title: Example · Checkout quality
+config:
+  look: classic
+  theme: dark
+  themeVariables:
+    cScale0: "#b3b3b3"
+    cScale1: "#93c5fd"
+  themeCSS: |
+    /* filled graticule rings wash out the curves */
+    .radarGraticule { fill: none; stroke: #555555; }
+    .radarCurve-0, .radarCurve-1 { fill-opacity: 0.1; }
+---
+%% `axis id["Label"]` per dimension, several per line; `curve id["Label"]{v, …}` lists values in axis order, `{axis: v, …}` names them.
+%% `max`/`min` fix the scale, `ticks` sets ring count, `graticule polygon|circle` picks the rings, `showLegend false` hides the legend.
+%% A body `title …` line is the alternative to frontmatter `title`.
+%% `config.radar`: `width` · `height` · `marginTop` … · `axisScaleFactor` · `axisLabelFactor` · `curveTension`.
+radar-beta
+  axis perf["Performance"], rel["Reliability"], ux["Usability"]
+  axis sec["Security"], cost["Cost"]
+  curve now["Current"]{3, 4, 2, 4, 3}
+  curve target["Target"]{ cost: 3, perf: 4, rel: 5, ux: 4, sec: 5 }
+  showLegend true
+  max 5
+  min 0
+  ticks 5
+  graticule polygon

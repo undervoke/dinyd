@@ -1,0 +1,34 @@
+---
+title: Example · Store deployment with pack icons
+config:
+  look: classic
+  theme: dark
+  architecture:
+    seed: 7
+---
+%% `pack:name` icons resolve only from packs the host page registers: Mermaid Preview registers `logos`, `mdi`, `fa`, `aws`, `azure`, `gcp`; MPE registers none, so it draws a `?` for each.
+%% Built-in and pack icons mix freely; `mdi`/`fa` glyphs and the `logos:aws` wordmark draw near-black on the dark background, so this example keeps the built-ins for people and boundaries.
+architecture-beta
+  service users(internet)[Customers]
+  group cloud(cloud)[AWS account]
+  group app(logos:aws-ec2)[App tier] in cloud
+  service lb(logos:aws-elb)[Load balancer] in cloud
+  service api(logos:aws-api-gateway)[Order API] in app
+  junction fanout in app
+  service worker(logos:aws-lambda)[Payment worker] in app
+  service db(logos:aws-aurora)[Order DB] in cloud
+  service files(logos:aws-s3)[Invoice files] in cloud
+  group backup(cloud)[Backup region]
+  service replica(logos:aws-glacier)[DB backup] in backup
+
+  users:R --> L:lb
+  lb:R --> L:api
+  api:R -- L:fanout
+  fanout:R <--> L:db
+  fanout:B --> T:worker
+  worker:R --> L:files
+  db{group}:R --> B:replica{group}
+  align row users lb api fanout db
+  align row worker files
+  align column fanout worker
+  align column db files

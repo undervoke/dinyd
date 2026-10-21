@@ -1,0 +1,28 @@
+---
+config:
+  look: classic
+  theme: dark
+  themeVariables:
+    cScale0: "#333333"
+    cScale1: "#333333"
+    cScale2: "#333333"
+    cScaleLabel0: "#e0e0e0"
+    cScaleLabel1: "#e0e0e0"
+    cScaleLabel2: "#e0e0e0"
+  timeline:
+    disableMulticolor: true
+---
+%% Timeline ignores the frontmatter title; the title is a `title` line.
+%% `section` groups periods; `period : event : event`, or a following line that starts with `:`, stacks several events under one period; `<br>` breaks a line.
+%% `timeline LR` (default) runs left to right, `timeline TD` top down.
+%% Every period takes one surface color (`cScale*` set to the surface; `disableMulticolor` alone covers only a timeline without sections), so sections, not hues, separate stages.
+timeline LR
+  title Example · Store release history
+  section 2025 · launch
+    Q1 : Product catalog : Search
+    Q2 : Checkout
+    Q4 : Gift cards
+  section 2026 · growth
+    Q1 : Mobile app : Saved carts
+       : Wish lists<br>shared by link
+    Q2 : Marketplace sellers

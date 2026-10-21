@@ -1,0 +1,38 @@
+---
+title: Example · Feature prioritization
+config:
+  look: classic
+  theme: dark
+  themeVariables:
+    quadrant1Fill: "#2a2a2a"
+    quadrant2Fill: "#242424"
+    quadrant3Fill: "#2a2a2a"
+    quadrant4Fill: "#242424"
+    quadrant1TextFill: "#b3b3b3"
+    quadrant2TextFill: "#b3b3b3"
+    quadrant3TextFill: "#b3b3b3"
+    quadrant4TextFill: "#b3b3b3"
+    quadrantPointFill: "#93c5fd"
+    quadrantPointTextFill: "#e0e0e0"
+    quadrantXAxisTextFill: "#e0e0e0"
+    quadrantYAxisTextFill: "#e0e0e0"
+    quadrantInternalBorderStrokeFill: "#6b6b6b"
+    quadrantExternalBorderStrokeFill: "#8a8a8a"
+    quadrantTitleFill: "#e0e0e0"
+---
+%% Axes run `low --> high`; quadrant-1 is top right, then counterclockwise: 2 top left, 3 bottom left, 4 bottom right.
+%% Points take `[x, y]` in 0–1; `:::class` with `classDef` marks the point under discussion.
+%% A body `title …` line is the alternative to frontmatter `title`.
+quadrantChart
+  x-axis Low effort --> High effort
+  y-axis Low impact --> High impact
+  quadrant-1 Plan · big bets
+  quadrant-2 Do now · quick wins
+  quadrant-3 Skip · low value
+  quadrant-4 Rethink · costly fill-ins
+  Saved carts: [0.25, 0.72]
+  One-click pay:::em: [0.38, 0.9]
+  Search rewrite: [0.82, 0.78]
+  Dark mode: [0.2, 0.3]
+  Legacy export: [0.7, 0.18]
+  classDef em color: #86efac, radius: 8

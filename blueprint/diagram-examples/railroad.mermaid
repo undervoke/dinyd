@@ -1,0 +1,23 @@
+---
+title: Example · Semantic version grammar
+config:
+  look: classic
+  theme: dark
+  railroad:
+    specialStroke: "#b3b3b3"
+---
+%% Other notations: `railroad-abnf-beta` (railroad-abnf), `railroad-peg-beta` (railroad-peg), `railroad-beta` IR constructors (railroad-ir).
+%% EBNF: `a b` or `a , b` sequence · `a | b` choice · `[ a ]` or `a?` optional · `{ a }` or `a*` zero or more · `a+` one or more · `( … )` group · `"x"` or `'x'` terminal · `? … ?` prose · `(* … *)` or `/* … */` comment; rules take `=` or `::=`.
+%% `a - b` (except) draws the minus as a literal terminal, reading as a, a hyphen, then b, so state an exclusion as `? … ?` prose.
+railroad-ebnf-beta
+title "Example · Semantic version grammar"
+version = core [ "-" prerelease ] [ "+" build ] ;
+core = number "." number "." number ;
+number = "0" | nonzero { digit } ;
+prerelease = identifier { "." identifier } ;
+(* build metadata never affects precedence *)
+build = identifier ( "." identifier )* ;
+identifier = ( letter | digit | "-" )+ ;
+nonzero = ? digit 1 to 9 ? ;
+digit = "0" | nonzero ;
+letter = ? ASCII letter ? ;

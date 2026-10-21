@@ -1,0 +1,39 @@
+---
+title: Example · Hourly checkout traffic
+config:
+  look: classic
+  theme: dark
+  xyChart:
+    showDataLabel: false
+  themeVariables:
+    xyChart:
+      backgroundColor: "#1f1f1f"
+      titleColor: "#e0e0e0"
+      legendTextColor: "#e0e0e0"
+      xAxisLabelColor: "#b3b3b3"
+      xAxisTitleColor: "#e0e0e0"
+      xAxisTickColor: "#6b6b6b"
+      xAxisLineColor: "#6b6b6b"
+      yAxisLabelColor: "#b3b3b3"
+      yAxisTitleColor: "#e0e0e0"
+      yAxisTickColor: "#6b6b6b"
+      yAxisLineColor: "#6b6b6b"
+      plotColorPalette: "#c4b5fd, #67e8f9, #93c5fd, #fcd34d, #fdba74, #e0e0e0"
+---
+%% `bar` for measured values per category, `line` for a target or trend over the same categories; `xychart horizontal` turns the chart sideways.
+%% `x-axis "Title" [a, "b c"]` lists categories, `x-axis "Title" 0 --> 100` makes it numeric; `y-axis "Title"` alone auto-ranges.
+%% `bar "Name" [...]` names a series; Mermaid 12 draws the legend from these names and 11.16 skips it, so also name each series here.
+%% Series: bars · checkout by payment (bank · wallet · card) · line · mobile (rising) · line · desktop (falling) · line · normal fit over the bar totals. A quoted string after a line value labels that point.
+%% There is no stacked bar: bars of one category draw over each other in order, so cumulative sums listed largest first read as a stack.
+%% `xyChart.showDataLabel` prints bar values; on overlapped bars Mermaid 12 repeats the first series' values, so it stays off here.
+%% A body `title …` line is the alternative to frontmatter `title`.
+%% An unnamed `bar [ … ]` draws without a legend entry; `xyChart.showDataLabelOutsideBar` moves bar values above the bars.
+xychart
+  x-axis "Hour" [9h, 10h, 11h, 12h, "13h · peak", 14h, 15h, 16h, 17h]
+  y-axis "Requests (thousands)" 0 --> 12
+  bar "Bank" [1.1, 3.6, 5.7, 9.2, 9.8, 9.1, 5.4, 3.7, 0.9]
+  bar "Wallet" [0.9, 3.0, 4.8, 7.8, 8.3, 7.7, 4.6, 3.1, 0.8]
+  bar "Card" [0.6, 2.0, 3.2, 5.0, 5.2, 4.9, 3.0, 2.1, 0.5]
+  line "Mobile" [1.2, 1.5, 1.7, 2.4, 4.6, 5.0, 5.3, 8.4, 9.1 "Evening"]
+  line "Desktop" [9.4 "Office hours", 9.0, 5.2, 3.9, 3.5, 2.2, 1.8, 1.1, 0.9]
+  line "Normal fit" [1.4, 3.2, 6.1, 8.8, 10.0 "Mean", 8.8, 6.1, 3.2, 1.4]

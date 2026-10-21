@@ -1,0 +1,19 @@
+---
+title: Example · Shipping option
+config:
+  look: classic
+  theme: dark
+  railroad:
+    specialStroke: "#b3b3b3"
+---
+%% `railroad-beta` writes the diagram as explicit constructors when no grammar notation maps onto the layout you want.
+%% Constructors: `terminal("x")` · `nonterminal("rule")` · `sequence(a, b, …)` · `choice(a, b, …)` · `optional(a)` · `zeroOrMore(a)` · `oneOrMore(a)` · `special("prose")`.
+railroad-beta
+title "Example · Shipping option"
+shipping = sequence(
+  terminal("ship:"),
+  choice(terminal("standard"), terminal("express"), nonterminal("pickup")),
+  optional(terminal("+insurance")),
+  zeroOrMore(sequence(terminal("+note:"), special("free text")))
+) ;
+pickup = sequence(terminal("pickup@"), oneOrMore(special("store id digit"))) ;

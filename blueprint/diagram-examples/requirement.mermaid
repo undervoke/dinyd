@@ -1,0 +1,77 @@
+---
+title: Example · Checkout requirements
+config:
+  look: handDrawn
+  handDrawnSeed: 5
+  theme: dark
+  themeVariables:
+    requirementBackground: "#333333"
+    requirementBorderColor: "#b3b3b3"
+    requirementTextColor: "#e0e0e0"
+    relationColor: "#b3b3b3"
+    relationLabelBackground: "#1f1f1f"
+    relationLabelColor: "#e0e0e0"
+---
+%% Kinds: requirement · functionalRequirement · performanceRequirement · interfaceRequirement · physicalRequirement · designConstraint.
+%% Relations read `source - kind -> target` or `target <- kind - source`: contains (parent to child) · derives (child from parent) · refines · traces · copies · satisfies and verifies (element to requirement).
+%% `risk`: low · medium · high; `verifymethod`: analysis · inspection · test · demonstration. Quoted text takes `**bold**` and `*italic*`.
+%% `direction TB|BT|LR|RL`; apply a class with `class id name` or `id:::name`.
+requirementDiagram
+  direction TB
+  requirement checkout_total {
+    id: R1
+    text: "Total includes tax and shipping"
+    risk: high
+    verifymethod: test
+  }
+  functionalRequirement refund_total {
+    id: R1.1
+    text: "Refund returns the full charged amount"
+    risk: medium
+    verifymethod: demonstration
+  }
+  performanceRequirement checkout_latency {
+    id: R2
+    text: "Checkout answers within 300 ms at p95 · issue, misses it today"
+    risk: medium
+    verifymethod: analysis
+  }
+  designConstraint card_storage {
+    id: C1
+    text: "Card numbers are never stored"
+    risk: high
+    verifymethod: inspection
+  }
+  interfaceRequirement payment_api {
+    id: R3
+    text: "Charge calls carry an **idempotency key**"
+    risk: low
+    verifymethod: test
+  }
+  physicalRequirement parcel_size {
+    id: R4
+    text: "Parcels fit a *standard locker*"
+    risk: low
+    verifymethod: inspection
+  }
+  element pricing_service {
+    type: "service"
+    docref: "docs/pricing.md"
+  }
+  element checkout_tests {
+    type: "test suite"
+  }
+
+  checkout_total - contains -> refund_total
+  checkout_latency - traces -> checkout_total
+  card_storage - refines -> checkout_total
+  pricing_service - satisfies -> checkout_total
+  checkout_tests - verifies -> checkout_total
+  payment_api - derives -> checkout_total
+  refund_total <- copies - payment_api
+  parcel_size - traces -> checkout_latency
+
+  classDef em fill:#173d25,stroke:#86efac
+  classDef issue fill:#422323,stroke:#fca5a5
+  class checkout_total em
+  checkout_latency:::issue
