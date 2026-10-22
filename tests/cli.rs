@@ -149,9 +149,13 @@ fn css_strings_are_exact_in_rule_selectors() {
     let repo = Repo::new();
     let css = "[aria-label=\"Save, close\"] > .icon { color: red; }\n";
     repo.write("site.css", css);
-    repo.write(
+    repo.write("doc.md", "Save button\n");
+    repo.git(&["add", "-A"]);
+    repo.apply(
         "doc.md",
-        "Save button <!-- dinyd-ref: site.css#[aria-label=\"Save, close\"]>.icon -->\n",
+        1,
+        "site.css#[aria-label=\"Save, close\"]>.icon",
+        &[],
     );
     repo.git(&["add", "-A"]);
     assert_eq!(repo.check(&[]).code, 0, "{}", repo.check(&[]).stderr);
@@ -190,7 +194,7 @@ fn vue_reads_spaced_script_attributes_and_skips_commented_scripts() {
 fn worktree_rejects_gitlinks_like_the_index() {
     let repo = Repo::new();
     repo.write("vendor/lib/file.txt", "x\n");
-    repo.write("doc.md", "Vendored <!-- dinyd-ref: vendor/lib -->\n");
+    repo.write("doc.md", "[Vendored](vendor/lib)\n");
     repo.git(&["add", "doc.md"]);
     let head = "0123456789012345678901234567890123456789";
     repo.git(&[
@@ -199,7 +203,7 @@ fn worktree_rejects_gitlinks_like_the_index() {
         "--cacheinfo",
         &format!("160000,{head},vendor/lib"),
     ]);
-    let expected = [format!("doc.md → vendor/lib: {UNRESOLVED}")];
+    let expected = [format!("doc.md → link vendor/lib: {UNRESOLVED}")];
     assert_eq!(repo.check(&["--index"]).lines(), expected);
     assert_eq!(repo.check(&["--worktree"]).lines(), expected);
 }
@@ -357,13 +361,13 @@ fn worktree_judges_the_file_type_on_disk() {
         ]);
     }
     repo.write("link.cs", CLASS);
-    repo.write("notes.md", "Gone <!-- dinyd-ref: missing.cs -->\n");
+    repo.write("notes.md", "[Gone](missing.cs)\n");
     repo.write("doc.md", "F claim.\n");
     repo.git(&["add", "doc.md"]);
     repo.apply("doc.md", 1, "link.cs#A.F", &["--worktree"]);
     assert_eq!(
         repo.check(&["--worktree"]).lines(),
-        [format!("notes.md → missing.cs: {UNRESOLVED}")]
+        [format!("notes.md → link missing.cs: {UNRESOLVED}")]
     );
 }
 

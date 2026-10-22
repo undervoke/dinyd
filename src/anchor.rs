@@ -5,16 +5,6 @@ use std::ops::Range;
 use pulldown_cmark::{Event, Options, Parser, Tag};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Kind {
-    /// `dinyd:` — a claim restating code facts, tied by a digest.
-    Digest,
-    /// `dinyd-ref:` — a delegation; only existence is checked.
-    Ref,
-    /// `dinyd-id:` or `/dinyd-id:` — a unit boundary; scan yields one only when malformed.
-    Declaration,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mode {
     /// Structural: tree-sitter tokens, whitespace between tokens ignored, comments included.
     S1,
@@ -42,7 +32,6 @@ pub struct Selector {
 
 #[derive(Clone, Debug)]
 pub struct Anchor {
-    pub kind: Kind,
     /// Selector text verbatim, as written in the document.
     pub selector_text: String,
     /// `None` when the anchor is malformed.
@@ -107,7 +96,6 @@ pub struct Comment {
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Keyword {
     Digest,
-    Ref,
     Start,
     End,
     /// `dinyd-lock` — a lock boundary opening a protected span.
@@ -116,9 +104,8 @@ pub enum Keyword {
     LockEnd,
 }
 
-const KEYWORDS: [(&str, Keyword); 6] = [
+const KEYWORDS: [(&str, Keyword); 5] = [
     ("dinyd:", Keyword::Digest),
-    ("dinyd-ref:", Keyword::Ref),
     ("dinyd-id:", Keyword::Start),
     ("/dinyd-id:", Keyword::End),
     ("dinyd-lock", Keyword::LockStart),
@@ -166,8 +153,7 @@ impl Comment {
     fn anchor(&self, src: &str) -> Option<Anchor> {
         let (keyword, rest) = self.keyword(src)?;
         let mut anchor = match keyword {
-            Keyword::Digest => parse_reference(src, Kind::Digest, rest..self.body.end, self.line),
-            Keyword::Ref => parse_reference(src, Kind::Ref, rest..self.body.end, self.line),
+            Keyword::Digest => parse_reference(src, rest..self.body.end, self.line),
             // Lock markers are protection metadata, never evidence references.
             Keyword::LockStart | Keyword::LockEnd => return None,
             Keyword::Start | Keyword::End => {
@@ -178,7 +164,6 @@ impl Comment {
                 let start = self.body.start + body.len() - body.trim_start().len();
                 let text = body.trim();
                 Anchor {
-                    kind: Kind::Declaration,
                     selector_text: text.to_string(),
                     selector: None,
                     digest: None,
@@ -338,8 +323,8 @@ fn starts_with_frontmatter(src: &str) -> bool {
     lines.next() == Some("---") && lines.any(|l| l == "---")
 }
 
-/// Parses the rest of a `dinyd:` or `dinyd-ref:` body, after its keyword.
-fn parse_reference(src: &str, kind: Kind, body: Range<usize>, line: usize) -> Anchor {
+/// Parses the rest of a `dinyd:` body, after its keyword.
+fn parse_reference(src: &str, body: Range<usize>, line: usize) -> Anchor {
     let rest_start = body.start;
     let rest = &src[rest_start..body.end];
     let rest_lead = rest.len() - rest.trim_start().len();
@@ -370,7 +355,7 @@ fn parse_reference(src: &str, kind: Kind, body: Range<usize>, line: usize) -> An
                 .bytes()
                 .all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'));
         match mode {
-            Some(mode) if valid && kind == Kind::Digest => digest = Some((mode, value.to_string())),
+            Some(mode) if valid => digest = Some((mode, value.to_string())),
             _ => malformed = true,
         }
         digest_span = Some(content_start + last_token_start..content_end);
@@ -383,7 +368,6 @@ fn parse_reference(src: &str, kind: Kind, body: Range<usize>, line: usize) -> An
         parse_selector(&selector_text)
     };
     Anchor {
-        kind,
         selector_text,
         selector,
         digest,

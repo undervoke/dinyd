@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 use crate::Error;
-use crate::anchor::{self, Anchor, DocKind, Kind};
+use crate::anchor::{self, Anchor, DocKind};
 use crate::git::{self, Basis, Repo, Snapshot};
 use crate::link;
 use crate::target::{self, Failure};
@@ -149,24 +149,19 @@ fn touches(changed: &BTreeSet<String>, doc: &str, path: &str) -> bool {
 }
 
 pub fn judge(snapshot: &Snapshot, anchor: &Anchor) -> Result<(Verdict, Option<String>), Error> {
+    // Malformed anchors, including every declaration scan yields, have no selector.
     let Some(selector) = &anchor.selector else {
         return Ok((Verdict::Malformed, None));
     };
-    let result = match anchor.kind {
-        // scan yields a declaration only when it is malformed, so it has no selector.
-        Kind::Declaration => return Ok((Verdict::Malformed, None)),
-        Kind::Ref => target::exists(snapshot, selector).map(|_| Verdict::Ok),
-        Kind::Digest => {
-            let recorded = anchor.digest.as_ref();
-            target::digest(snapshot, selector, recorded.map(|(mode, _)| *mode)).map(|(_, value)| {
-                match recorded {
-                    None => Verdict::Undeclared,
-                    Some((_, old)) if *old == value => Verdict::Ok,
-                    Some(_) => Verdict::Stale,
-                }
-            })
-        }
-    };
+    let recorded = anchor.digest.as_ref();
+    let result =
+        target::digest(snapshot, selector, recorded.map(|(mode, _)| *mode)).map(|(_, value)| {
+            match recorded {
+                None => Verdict::Undeclared,
+                Some((_, old)) if *old == value => Verdict::Ok,
+                Some(_) => Verdict::Stale,
+            }
+        });
     match result {
         Ok(verdict) => Ok((verdict, None)),
         Err(Failure::Unresolved(reason)) => Ok((Verdict::Unresolved, Some(reason))),

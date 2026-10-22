@@ -56,11 +56,8 @@ enum Command {
         #[arg(long)]
         selector: String,
         /// Use b1 (bytes) instead of the format default.
-        #[arg(long, conflicts_with = "reference")]
+        #[arg(long)]
         bytes: bool,
-        /// Write a delegation reference (dinyd-ref) without a digest.
-        #[arg(long = "ref", id = "reference")]
-        reference: bool,
         #[command(flatten)]
         basis: BasisArgs,
     },
@@ -234,7 +231,6 @@ fn run(command: Command, input: &[u8]) -> Result<ExitCode, Error> {
             line,
             selector,
             bytes,
-            reference,
             basis,
         } => {
             let repo = Repo::discover()?;
@@ -245,7 +241,6 @@ fn run(command: Command, input: &[u8]) -> Result<ExitCode, Error> {
                     line,
                     selector: &selector,
                     bytes,
-                    reference,
                     basis: basis.basis(),
                 },
             )?;

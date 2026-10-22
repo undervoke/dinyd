@@ -80,26 +80,6 @@ struct Region {
     tokens: Vec<u8>,
 }
 
-/// Checks that a `dinyd-ref:` selector names exactly one existing target; directories allowed.
-pub fn exists(snapshot: &Snapshot, selector: &Selector) -> Result<(), Failure> {
-    match snapshot.lookup(&selector.path) {
-        Lookup::Dir if selector.location.is_none() => Ok(()),
-        Lookup::Dir => unresolved("a directory has no locations"),
-        Lookup::File => match (&selector.location, DocKind::of(&selector.path)) {
-            (None, _) => Ok(()),
-            (Some(name), Some(kind)) => {
-                unit(kind, &snapshot.read(&selector.path)?, name).map(|_| ())
-            }
-            (Some(location), None) => {
-                let source = snapshot.read(&selector.path)?;
-                regions(&selector.path, &source, location).map(|_| ())
-            }
-        },
-        Lookup::Rejected => unresolved("not a regular file"),
-        Lookup::Missing => unresolved("no such path"),
-    }
-}
-
 /// Digest of a `dinyd:` target in `mode`, or in the format default when `mode` is `None`.
 pub fn digest(
     snapshot: &Snapshot,

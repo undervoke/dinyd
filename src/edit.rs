@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use crate::Error;
-use crate::anchor::{self, Anchor, DocKind, Kind, LineIndex, Mode, Selector};
+use crate::anchor::{self, Anchor, DocKind, LineIndex, Mode, Selector};
 use crate::git::{Basis, Repo, Snapshot};
 use crate::target::{self, Failure};
 
@@ -12,7 +12,6 @@ pub struct ApplyRequest<'a> {
     pub line: usize,
     pub selector: &'a str,
     pub bytes: bool,
-    pub reference: bool,
     pub basis: Basis,
 }
 
@@ -31,25 +30,18 @@ pub fn apply(repo: &Repo, request: ApplyRequest) -> Result<(String, String), Err
 
     let snapshot = Snapshot::load(repo, request.basis)?;
     let basis = snapshot.basis().describe();
-    let resolved = if request.reference {
-        target::exists(&snapshot, &selector).map(|_| None)
-    } else {
-        target::digest(&snapshot, &selector, request.bytes.then_some(Mode::B1)).map(Some)
-    };
-    let digest = match resolved {
-        Ok(digest) => digest,
-        Err(Failure::Unresolved(reason)) => {
-            return Err(Error::Refused(format!(
-                "{}: unresolved in {basis} ({reason}); nothing written",
-                request.selector
-            )));
-        }
-        Err(Failure::Read(e)) => return Err(e),
-    };
-    let text = match &digest {
-        Some((mode, value)) => format!("dinyd: {} {}:{value}", request.selector, mode.as_str()),
-        None => format!("dinyd-ref: {}", request.selector),
-    };
+    let (mode, value) =
+        match target::digest(&snapshot, &selector, request.bytes.then_some(Mode::B1)) {
+            Ok(digest) => digest,
+            Err(Failure::Unresolved(reason)) => {
+                return Err(Error::Refused(format!(
+                    "{}: unresolved in {basis} ({reason}); nothing written",
+                    request.selector
+                )));
+            }
+            Err(Failure::Read(e)) => return Err(e),
+        };
+    let text = format!("dinyd: {} {}:{value}", request.selector, mode.as_str());
 
     let target_line = match kind {
         DocKind::Markdown => request.line,
@@ -93,15 +85,10 @@ pub fn apply(repo: &Repo, request: ApplyRequest) -> Result<(String, String), Err
 
     let visible = anchor::scan(kind, &updated).iter().any(|a| {
         a.line == target_line
-            && a.kind
-                == if digest.is_some() {
-                    Kind::Digest
-                } else {
-                    Kind::Ref
-                }
             && a.selector.as_ref() == Some(&selector)
-            && a.digest.as_ref().map(|(m, v)| (*m, v.as_str()))
-                == digest.as_ref().map(|(m, v)| (*m, v.as_str()))
+            && a.digest
+                .as_ref()
+                .is_some_and(|(m, v)| *m == mode && *v == value)
     });
     if !visible {
         return Err(Error::Refused(format!(
@@ -133,15 +120,8 @@ pub fn digest(repo: &Repo, request: DigestRequest) -> Result<Digested, Error> {
         .into_iter()
         .filter(|a| a.line == request.line && a.selector.is_some() && a.selector == expected)
         .collect();
-    let digest_anchors: Vec<&Anchor> = anchors.iter().filter(|a| a.kind == Kind::Digest).collect();
-    let anchor = match digest_anchors.as_slice() {
-        [anchor] => *anchor,
-        [] if !anchors.is_empty() => {
-            return Err(Error::Refused(format!(
-                "{} is a delegation reference; it has no digest",
-                request.expect_selector
-            )));
-        }
+    let anchor = match anchors.as_slice() {
+        [anchor] => anchor,
         [] => {
             return Err(Error::Refused(format!(
                 "no digest anchor for {} on line {}; nothing written",

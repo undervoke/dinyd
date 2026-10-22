@@ -16,12 +16,10 @@ config:
 flowchart LR
   subgraph Doc["referencing document"]
     Claim["restated claim"]
-    Delegation["delegation"]
     Dest["Markdown destination"]
   end
 
   Claim -->|digest anchor| Evidence["selected evidence<br/><small>code region · document unit · file</small>"]
-  Delegation -->|explicit existence reference| Target["referenced target<br/><small>file · directory · selected region</small>"]
   Dest -->|local link · import| Path["referenced path<br/><small>file · directory</small>"]
 
   classDef em fill:#173d25,stroke:#86efac

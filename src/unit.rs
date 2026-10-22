@@ -49,16 +49,14 @@ pub fn content(kind: DocKind, src: &str, name: &str) -> Result<Vec<u8>, String> 
 }
 
 /// What a dinyd comment inside a unit removes: its whole line when it stands alone there;
-/// otherwise a declaration or lock marker is zero-width and a reference takes the one space
+/// otherwise a declaration or lock marker is zero-width and an anchor takes the one space
 /// apply puts before it.
 fn cut(src: &str, comment: &Comment) -> Option<Range<usize>> {
     let (keyword, _) = comment.keyword(src)?;
     let extent = comment.extent.clone();
     Some(match own_line(src, &extent) {
         Some(line) => line,
-        None if matches!(keyword, Keyword::Digest | Keyword::Ref)
-            && src[..extent.start].ends_with(' ') =>
-        {
+        None if keyword == Keyword::Digest && src[..extent.start].ends_with(' ') => {
             extent.start - 1..extent.end
         }
         None => extent,

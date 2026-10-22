@@ -100,14 +100,10 @@ code files or in a separate mapping file.
 
 ```md
 Passwords are verified in constant time. <!-- dinyd: src/Hasher.cs#PasswordHasher.Verify s1:3f9a0c1d2e4b5a6c -->
-
-The release rules are owned by the workflow. <!-- dinyd-ref: .github/workflows/release.yml -->
 ```
 
-- `dinyd:` is a **digest anchor**: the claim restates facts of the target, and
-  the digest records the target as it was when the claim was last judged.
-- `dinyd-ref:` is a **delegation**: the claim only points at the target, so
-  dinyd checks that it exists. It may name a directory.
+`dinyd:` is a **digest anchor**: the claim restates facts of the target, and
+the digest records the target as it was when the claim was last judged.
 
 Documents are tracked Markdown files (and [Mermaid](#mermaid) files). An
 anchor is an HTML comment anywhere outside code blocks and inline code.
@@ -150,9 +146,6 @@ Read [Checks](verification/checks.md), then the [migrations](../../db/migrations
 - URLs, same-document `#fragment` links, and anything in code, frontmatter,
   or raw HTML (an HTML comment included) are not checked. To mention a path
   that should not be checked, write it as inline code.
-
-`dinyd-ref` remains for what a link cannot carry: a location such as a
-symbol or a unit, or a path mentioned in prose or inline code.
 
 ### Selectors
 
@@ -272,7 +265,7 @@ target did not resolve goes to stderr.
 ### apply
 
 ```sh
-dinyd apply <doc> --line <n> --selector <selector> [--bytes | --ref] [--index | --worktree | --rev <commit>]
+dinyd apply <doc> --line <n> --selector <selector> [--bytes] [--index | --worktree | --rev <commit>]
 ```
 
 Writes one anchor with its mode and first digest at the end of line `n`. It
