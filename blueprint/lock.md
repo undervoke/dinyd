@@ -14,7 +14,7 @@ Re-parsing the post-edit file is necessary because an unclosed code fence can de
 Unchanged patch context, whole-file writes preserving the protected source, and new enclosing locks remain valid.
 For a file already marked as locked, malformed markers or an edit that cannot be reconstructed exactly deny the call; the instruction is to repair the markers or re-read the file.
 A failing file rejects the whole call before any write, so a multi-file edit cannot partially apply before the guard answers.
-The refusal gives only the path and a short instruction, such as `<path>: locked section. Leave it unchanged.`
+The refusal gives only the path and a short instruction, such as `<path>: locked section. Leave it unchanged.` <!-- dinyd: src/lock.rs#locked_denial s1:b65c17262200774e -->
 Lock markers follow unit-marker projection in `d1`, keeping the protection declaration separate from the evidence.
 `dinyd-id` selects evidence; lock ownership is independent of [evidence references](anchors.md).
 
