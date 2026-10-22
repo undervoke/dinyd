@@ -339,6 +339,46 @@ fn nested_and_conditional_declarations_are_symbols() {
 }
 
 #[test]
+fn rust_symbols_nest_under_types_traits_and_modules() {
+    let repo = Repo::new();
+    let source = "#[derive(Clone)]\nstruct S;\nimpl S { fn f(&self) {} }\nimpl std::fmt::Display for S {\n    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result { Ok(()) }\n}\ntrait T { fn m(&self); }\ntrait Label { fn label(&self); }\nimpl Label for &str { fn label(&self) {} }\nmacro_rules! m { () => {}; }\nmod a {\n    struct S2 {\n        #[serde(rename = \"wire\")]\n        name: String,\n    }\n    enum E { A, B }\n}\n";
+    repo.write("lib.rs", source);
+    let selectors = [
+        "lib.rs#S",
+        "lib.rs#S.f",
+        "lib.rs#S.Display",
+        "lib.rs#S.Display.fmt",
+        "lib.rs#T.m",
+        "lib.rs#str.Label.label",
+        "lib.rs#m",
+        "lib.rs#a.S2.name",
+        "lib.rs#a.E.A",
+    ];
+    repo.write("doc.md", &"claim\n".repeat(selectors.len()));
+    repo.git(&["add", "-A"]);
+    for (i, selector) in selectors.iter().enumerate() {
+        repo.apply("doc.md", i + 1, selector, &[]);
+    }
+    repo.git(&["add", "-A"]);
+    assert_eq!(repo.check(&[]).code, 0);
+
+    // Leading attributes belong to the item they precede.
+    repo.write(
+        "lib.rs",
+        &source
+            .replace("derive(Clone)", "derive(Clone, Copy)")
+            .replace("\"wire\"", "\"name\""),
+    );
+    assert_eq!(
+        repo.check(&["--worktree"]).lines(),
+        [
+            format!("doc.md → lib.rs#S: {STALE}"),
+            format!("doc.md → lib.rs#a.S2.name: {STALE}"),
+        ]
+    );
+}
+
+#[test]
 fn worktree_judges_the_file_type_on_disk() {
     let repo = Repo::new();
     // The index records link.cs and notes.md as symlinks; on disk they are now regular files.

@@ -175,14 +175,18 @@ as the only separator. Without `#location` the selector is the whole file.
 | Target | Location |
 |---|---|
 | C#, TypeScript, JavaScript, Go | Symbol path: `Class.Method`, `Namespace.Type.Field`, `Type.Method` (Go), `Enum.Member` |
+| Rust | Symbol path: `module.Type.method`, `Type.Trait.method`, `Struct.field`, `Enum.Variant` |
 | Vue | Symbol path inside a top-level `<script>` or `<script setup>` |
 | JSON, YAML | JSON Pointer: `/scripts/build`, `/jobs/test/steps/0` |
 | CSS | A rule's selector: `.card > .title` |
 | Document | A unit's name: `docs/auth.md#refresh` |
 
 C# namespaces are not part of the path; TypeScript namespaces and modules
-are. Members that share a name (overloads) are ambiguous; `Verify(*)` takes
-all of them, in source order, as one region.
+and Rust inline modules are. A Rust trait impl is `Type.Trait`, each named by
+its last segment without generics or references (`impl<T> fmt::Display for
+&Wrapper<T>` is `Wrapper.Display`), and the outer attributes directly before
+a Rust item belong to its region. Members that share a name (overloads) are
+ambiguous; `Verify(*)` takes all of them, in source order, as one region.
 
 ### Digest modes
 

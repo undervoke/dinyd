@@ -33,6 +33,7 @@ enum Format {
     Tsx,
     JavaScript,
     Go,
+    Rust,
     Json,
     Yaml,
     Css,
@@ -50,6 +51,7 @@ impl Format {
             Some("tsx") => Format::Tsx,
             Some("js" | "mjs" | "cjs" | "jsx") => Format::JavaScript,
             Some("go") => Format::Go,
+            Some("rs") => Format::Rust,
             Some("json") => Format::Json,
             Some("yaml" | "yml") => Format::Yaml,
             Some("css") => Format::Css,
@@ -66,6 +68,7 @@ impl Format {
             Format::Tsx => tree_sitter_typescript::LANGUAGE_TSX.into(),
             Format::JavaScript => tree_sitter_javascript::LANGUAGE.into(),
             Format::Go => tree_sitter_go::LANGUAGE.into(),
+            Format::Rust => tree_sitter_rust::LANGUAGE.into(),
             Format::Json => tree_sitter_json::LANGUAGE.into(),
             Format::Yaml => tree_sitter_yaml::LANGUAGE.into(),
             Format::Css => tree_sitter_css::LANGUAGE.into(),
@@ -177,6 +180,26 @@ fn region(node: Node, source: &[u8], offset: usize) -> Region {
     }
 }
 
+/// Region of the siblings from `first` through `node`.
+fn span_region(first: Node, node: Node, source: &[u8], offset: usize) -> Region {
+    let mut tokens = Vec::new();
+    let mut at = first.start_byte();
+    let mut sibling = Some(first);
+    while let Some(current) = sibling {
+        gap(&source[at..current.start_byte().max(at)], &mut tokens);
+        serialize(current, source, &mut tokens);
+        at = current.end_byte();
+        if current == node {
+            break;
+        }
+        sibling = current.next_sibling();
+    }
+    Region {
+        range: first.start_byte() + offset..node.end_byte() + offset,
+        tokens,
+    }
+}
+
 /// Structural token stream: tokens plus nesting markers per named node, without node kinds.
 /// Whitespace between tokens never reaches the stream. Strings, scalars, and comments keep
 /// their literal content verbatim, since some grammars (YAML) leave it outside any leaf.
@@ -248,7 +271,12 @@ fn gap(text: &[u8], out: &mut Vec<u8>) {
 fn regions(path: &str, source: &[u8], location: &str) -> Result<Vec<Region>, Failure> {
     let format = Format::of(path);
     match format {
-        Format::CSharp | Format::TypeScript | Format::Tsx | Format::JavaScript | Format::Go => {
+        Format::CSharp
+        | Format::TypeScript
+        | Format::Tsx
+        | Format::JavaScript
+        | Format::Go
+        | Format::Rust => {
             let tree = parse(format.language().unwrap(), source)?;
             let mut symbols = Vec::new();
             collect(
@@ -303,12 +331,14 @@ enum Lang {
     CSharp,
     Script,
     Go,
+    Rust,
 }
 
 fn lang_of(format: Format) -> Lang {
     match format {
         Format::CSharp => Lang::CSharp,
         Format::Go => Lang::Go,
+        Format::Rust => Lang::Rust,
         _ => Lang::Script,
     }
 }
@@ -316,9 +346,18 @@ fn lang_of(format: Format) -> Lang {
 struct Symbol<'t> {
     path: Vec<String>,
     node: Node<'t>,
+    /// An earlier sibling the region starts from, such as a Rust item's leading attribute.
+    first: Option<Node<'t>>,
 }
 
 impl Symbol<'_> {
+    fn region(&self, source: &[u8], offset: usize) -> Region {
+        match self.first {
+            Some(first) => span_region(first, self.node, source, offset),
+            None => region(self.node, source, offset),
+        }
+    }
+
     /// The selector names the dotted path; a segment may itself contain dots, such as the
     /// module name in `declare module "decimal.js"`.
     fn matches(&self, name: &str) -> bool {
@@ -340,11 +379,8 @@ fn pick_symbols(
     matches.sort_by_key(|s| s.node.start_byte());
     match matches.len() {
         0 => unresolved("symbol not found"),
-        1 => Ok(vec![region(matches[0].node, source, offset)]),
-        _ if grouped => Ok(matches
-            .iter()
-            .map(|s| region(s.node, source, offset))
-            .collect()),
+        1 => Ok(vec![matches[0].region(source, offset)]),
+        _ if grouped => Ok(matches.iter().map(|s| s.region(source, offset)).collect()),
         _ => unresolved("same-named members are ambiguous; name(*) groups them"),
     }
 }
@@ -366,7 +402,11 @@ fn children_by_field<'t>(node: Node<'t>, field: &str) -> Vec<Node<'t>> {
 fn push<'t>(out: &mut Vec<Symbol<'t>>, prefix: &[String], name: &str, node: Node<'t>) {
     let mut path = prefix.to_vec();
     path.push(name.to_string());
-    out.push(Symbol { path, node });
+    out.push(Symbol {
+        path,
+        node,
+        first: None,
+    });
 }
 
 /// Declarations as dotted paths of their enclosing named declarations.
@@ -382,6 +422,7 @@ fn collect<'t>(
             Lang::CSharp => collect_csharp(child, source, prefix, out),
             Lang::Script => collect_script(child, source, prefix, out),
             Lang::Go => collect_go(child, source, prefix, out),
+            Lang::Rust => collect_rust(child, source, prefix, out),
         }
     }
 }
@@ -412,6 +453,7 @@ fn container_path<'t>(
     out.push(Symbol {
         path: prefix.clone(),
         node,
+        first: None,
     });
     if let Some(body) = node.child_by_field_name("body") {
         collect(body, source, lang, prefix, out);
@@ -693,6 +735,93 @@ fn go_members<'t>(ty: Node<'t>, source: &[u8], owner: &str, out: &mut Vec<Symbol
             }
         }
         _ => {}
+    }
+}
+
+fn collect_rust<'t>(
+    node: Node<'t>,
+    source: &[u8],
+    prefix: &mut Vec<String>,
+    out: &mut Vec<Symbol<'t>>,
+) {
+    let start = out.len();
+    let name = node
+        .child_by_field_name("name")
+        .map(|n| text(n, source).to_string());
+    match node.kind() {
+        "mod_item" | "struct_item" | "enum_item" | "union_item" | "trait_item" => {
+            if let Some(name) = name {
+                container(node, &name, source, Lang::Rust, prefix, out);
+            }
+        }
+        "impl_item" => {
+            let Some(ty) = node
+                .child_by_field_name("type")
+                .and_then(|t| rust_type_name(t, source))
+            else {
+                return;
+            };
+            match node.child_by_field_name("trait") {
+                Some(tr) => {
+                    if let Some(tr) = rust_type_name(tr, source) {
+                        container_path(node, &[&ty, &tr], source, Lang::Rust, prefix, out);
+                    }
+                }
+                // An inherent impl block is not a symbol; its members name the type.
+                None => {
+                    if let Some(body) = node.child_by_field_name("body") {
+                        prefix.push(ty);
+                        collect(body, source, Lang::Rust, prefix, out);
+                        prefix.pop();
+                    }
+                }
+            }
+        }
+        "foreign_mod_item" => {
+            if let Some(body) = node.child_by_field_name("body") {
+                collect(body, source, Lang::Rust, prefix, out);
+            }
+        }
+        "function_item"
+        | "function_signature_item"
+        | "const_item"
+        | "static_item"
+        | "type_item"
+        | "associated_type"
+        | "macro_definition"
+        | "field_declaration"
+        | "enum_variant" => {
+            if let Some(name) = name {
+                push(out, prefix, &name, node);
+            }
+        }
+        _ => {}
+    }
+    // Leading attributes are part of the evidence: changing a derive or cfg changes the digest.
+    let mut first = None;
+    let mut sibling = node.prev_sibling();
+    while let Some(attribute) = sibling.filter(|s| s.kind() == "attribute_item") {
+        first = Some(attribute);
+        sibling = attribute.prev_sibling();
+    }
+    for symbol in &mut out[start..] {
+        if symbol.node == node {
+            symbol.first = first;
+        }
+    }
+}
+
+/// The last segment of a type or trait name, without generic arguments or references.
+fn rust_type_name(node: Node, source: &[u8]) -> Option<String> {
+    match node.kind() {
+        "type_identifier" | "primitive_type" | "identifier" => Some(text(node, source).to_string()),
+        "generic_type" | "reference_type" => node
+            .child_by_field_name("type")
+            .and_then(|n| rust_type_name(n, source)),
+        "scoped_type_identifier" | "scoped_identifier" => node
+            .child_by_field_name("name")
+            .and_then(|n| rust_type_name(n, source)),
+        _ => None,
     }
 }
 
