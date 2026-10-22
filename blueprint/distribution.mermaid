@@ -1,5 +1,5 @@
 ---
-title: dinyd · build · release and run boundary
+title: dinyd · release and installation responsibilities
 config:
   look: handDrawn
   handDrawnSeed: 5
@@ -7,33 +7,36 @@ config:
   themeVariables:
     mainBkg: "#333333"
     clusterBkg: "#242424"
+  flowchart:
+    titleTopMargin: 110
   themeCSS: |
     small { display: inline-block; text-align: left; }
-  flowchart:
-    wrappingWidth: 300
 ---
 %% Behavior authority: distribution.md.
-flowchart LR
-  Tag["version tag push"]
-  subgraph Build["GitHub Actions · dist"]
-    Matrix["native platform builds"]
-    Release@{ shape: docs, label: "release artifacts<br/><small>archives · checksums · installers</small>" }
-    Matrix --> Release
-  end
-  Bootstrap["bootstrap installer<br/><small>user bin · PATH</small>"]
-  Fetch["native acquisition<br/><small>verify the archive's SHA-256</small>"]
-  Global@{ shape: fr-rect, label: "dinyd on PATH" }
-  Cache@{ shape: bow-rect, label: "exact-version runtimes" }
+swimlane-beta TB
+  accTitle: DinyD release and installation responsibilities
+  accDescr: The release workflow publishes artifacts. The bootstrap installer installs the global executable. DinyD verifies downloaded archives before publishing a project runtime or replacing itself.
 
-  Tag --> Matrix
-  Release --> Bootstrap --> Global
-  Release --> Fetch
-  Fetch -->|project runtime| Cache
-  Fetch -->|self-update| Global
+  subgraph release [GitHub Actions · dist]
+    Build["build for native platforms<br/><small>triggered by a version tag</small>"]
+    Publish["publish release artifacts<br/><small>archives · checksums · installers</small>"]
+  end
+
+  subgraph bootstrap [Bootstrap installer]
+    Install["install dinyd<br/><small>• user bin · PATH<br/>• checksum verification varies by platform</small>"]
+  end
+
+  subgraph runtime [DinyD runtime]
+    Acquire["download and verify<br/><small>full SHA-256 against the release sidecar</small>"]
+    Cache["publish exact-version runtime<br/><small>visible in the cache only when complete</small>"]
+    Update["replace the invoked executable<br/><small>Windows-capable replacement</small>"]
+  end
+
+  Build --> Publish
+  Publish -->|initial install| Install
+  Publish -->|project setup · self-update| Acquire
+  Acquire -->|project runtime| Cache
+  Acquire -->|self-update| Update
 
   classDef em fill:#173d25,stroke:#86efac
-  classDef cache fill:#163a40,stroke:#67e8f9
-  classDef file fill:#3d3415,stroke:#fcd34d
-  class Fetch em
-  class Cache cache
-  class Release file
+  class Acquire em
