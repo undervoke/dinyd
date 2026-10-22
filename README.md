@@ -125,10 +125,11 @@ anchors.
 
 ### Links
 
-A link is a reference too: every Markdown link, image, and own-line
+A link is a reference too, with no anchor needed: every Markdown link, image,
+and own-line
 [Markdown Preview Enhanced](https://shd101wyy.github.io/markdown-preview-enhanced/)
 `@import "path"` must name a path that exists in the same view as the
-document, with no anchor written next to it.
+document.
 
 ```md
 Read [Checks](verification/checks.md), then the [migrations](../../db/migrations/).
@@ -146,6 +147,23 @@ Read [Checks](verification/checks.md), then the [migrations](../../db/migrations
 - URLs, same-document `#fragment` links, and anything in code, frontmatter,
   or raw HTML (an HTML comment included) are not checked. To mention a path
   that should not be checked, write it as inline code.
+
+### Bound anchors
+
+A digest anchor whose selector names no path takes the path of the Markdown
+link or image right before it; only spaces or tabs may stand between them:
+
+```md
+See [workspace departments](adr/031.md#L30-L45)<!-- dinyd: #departments d1:5be0c9e2a1f47d38 -->.
+```
+
+- It inherits the path through [link resolution](#links); the comment
+  supplies `#location`, or nothing for the whole file. A reference link binds
+  where it is used.
+- A path-less anchor that follows no link is malformed.
+- check prints a bound anchor's selector, and digest's `--expect-selector`
+  takes it, as the repository path and location, such as
+  `docs/ADR Notes.md#departments`.
 
 ### Selectors
 
@@ -174,7 +192,7 @@ all of them, in source order, as one region.
   but a document unit.
 - `d1` (document unit): the unit's bytes with CRLF turned into LF and dinyd
   comments taken out — a comment alone on its line with that line, a
-  declaration or lock marker by itself, an anchor with the one space before it. So adding,
+  declaration or lock marker by itself, an anchor with the one space before it, if any. So adding,
   removing, or updating anchors and inner units never changes it, while any
   other edit inside the unit does. The only mode for document units.
 
@@ -268,10 +286,12 @@ target did not resolve goes to stderr.
 dinyd apply <doc> --line <n> --selector <selector> [--bytes] [--index | --worktree | --rev <commit>]
 ```
 
-Writes one anchor with its mode and first digest at the end of line `n`. It
-prints the anchor and names the view the target was read from. It refuses,
-writing nothing, when the target does not resolve, the same anchor is already
-there, or check's parser would not read the written anchor, as inside a code
+Writes one anchor with its mode and first digest. The first link ending on
+line `n` that names the selector's path takes the anchor; with no such link,
+or when that link is already bound, it goes at the end of line `n`. It prints
+the anchor and names the view the target was read from. It refuses, writing
+nothing, when the target does not resolve, the same anchor is already there,
+or check's parser would not read the written anchor back, as inside a code
 block.
 
 ### digest

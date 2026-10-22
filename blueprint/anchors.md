@@ -1,7 +1,7 @@
 # Anchors
 
 The [README](../README.md#anchors) owns the anchor, selector, unit, link, and digest contract.
-Deriving a [link's existence reference](../README.md#links) from its written destination avoids a separately maintained path drifting from the link.
+Deriving a [link's existence reference](../README.md#links), and the path of an [anchor bound](../README.md#bound-anchors) to it, from its written destination avoids a separately maintained path drifting from the link.
 The code → claim direction is obtained by scanning documents.
 Selectors never name line numbers.
 `s1` hashes tokens and nesting, not node kind names.

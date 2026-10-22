@@ -30,28 +30,63 @@ pub struct Selector {
     pub location: Option<String>,
 }
 
+impl Selector {
+    /// The effective `path` or `path#location`.
+    pub fn text(&self) -> String {
+        match &self.location {
+            Some(location) => format!("{}#{location}", self.path),
+            None => self.path.clone(),
+        }
+    }
+}
+
+/// What an anchor references.
+#[derive(Clone, Debug)]
+pub enum Reference {
+    /// Judged against this selector: written in the comment, or a bound link's path with the
+    /// comment's location.
+    Selector(Selector),
+    /// No path: the location, or `None` for the whole file, of the link the comment follows.
+    /// Left unbound, the anchor is malformed.
+    Inherited(Option<String>),
+    /// Bound to a link that supplies no repository file.
+    Unresolved {
+        written: String,
+        reason: String,
+    },
+    Malformed,
+}
+
 #[derive(Clone, Debug)]
 pub struct Anchor {
     /// Selector text verbatim, as written in the document.
     pub selector_text: String,
-    /// `None` when the anchor is malformed.
-    pub selector: Option<Selector>,
+    pub reference: Reference,
     pub digest: Option<(Mode, String)>,
     /// 1-based line (LF counted) where the anchor's comment starts.
     pub line: usize,
+    /// Byte offset where the anchor's comment opens.
+    pub start: usize,
     pub selector_span: Range<usize>,
     pub digest_span: Option<Range<usize>>,
     /// False when the comment's terminator was lost.
     pub terminated: bool,
+    /// A terminated `dinyd:` comment whose selector text names no path: it binds to the link it
+    /// directly follows.
+    pub binds: bool,
 }
 
 impl Anchor {
-    /// Selector text for output, never carrying digest metadata or prose. A malformed anchor in
-    /// a closed one-line comment shows its non-digest tokens; one whose comment lost its
-    /// terminator or spans lines shows only the first, since what follows may be prose.
+    /// Selector text for output, never carrying digest metadata or prose. A judged selector
+    /// prints with control characters escaped, and a bound link that supplies no file as `link`
+    /// and its destination. A malformed anchor in a closed one-line comment shows its
+    /// non-digest tokens; one whose comment lost its terminator or spans lines shows only the
+    /// first, since what follows may be prose.
     pub fn display_selector(&self) -> String {
-        if self.selector.is_some() {
-            return self.selector_text.clone();
+        match &self.reference {
+            Reference::Selector(selector) => return escape(&selector.text()),
+            Reference::Unresolved { written, .. } => return format!("link {}", escape(written)),
+            Reference::Inherited(_) | Reference::Malformed => {}
         }
         let mut tokens = self
             .selector_text
@@ -63,6 +98,19 @@ impl Anchor {
             tokens.next().unwrap_or("").to_string()
         }
     }
+}
+
+/// Control characters escaped, so that printed text never breaks an output line.
+pub fn escape(text: &str) -> String {
+    text.chars()
+        .map(|c| {
+            if c.is_control() {
+                c.escape_default().to_string()
+            } else {
+                c.to_string()
+            }
+        })
+        .collect()
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -153,7 +201,9 @@ impl Comment {
     fn anchor(&self, src: &str) -> Option<Anchor> {
         let (keyword, rest) = self.keyword(src)?;
         let mut anchor = match keyword {
-            Keyword::Digest => parse_reference(src, rest..self.body.end, self.line),
+            Keyword::Digest => {
+                parse_reference(src, rest..self.body.end, self.line, self.extent.start)
+            }
             // Lock markers are protection metadata, never evidence references.
             Keyword::LockStart | Keyword::LockEnd => return None,
             Keyword::Start | Keyword::End => {
@@ -165,18 +215,21 @@ impl Comment {
                 let text = body.trim();
                 Anchor {
                     selector_text: text.to_string(),
-                    selector: None,
+                    reference: Reference::Malformed,
                     digest: None,
                     line: self.line,
+                    start: self.extent.start,
                     selector_span: start..start + text.len(),
                     digest_span: None,
                     terminated: true,
+                    binds: false,
                 }
             }
         };
         if !self.terminated {
-            anchor.selector = None;
+            anchor.reference = Reference::Malformed;
             anchor.terminated = false;
+            anchor.binds = false;
         }
         Some(anchor)
     }
@@ -323,8 +376,8 @@ fn starts_with_frontmatter(src: &str) -> bool {
     lines.next() == Some("---") && lines.any(|l| l == "---")
 }
 
-/// Parses the rest of a `dinyd:` body, after its keyword.
-fn parse_reference(src: &str, body: Range<usize>, line: usize) -> Anchor {
+/// Parses the rest of a `dinyd:` body, after its keyword, for a comment opening at `start`.
+fn parse_reference(src: &str, body: Range<usize>, line: usize, start: usize) -> Anchor {
     let rest_start = body.start;
     let rest = &src[rest_start..body.end];
     let rest_lead = rest.len() - rest.trim_start().len();
@@ -362,19 +415,30 @@ fn parse_reference(src: &str, body: Range<usize>, line: usize) -> Anchor {
         selector_end = content_start + content[..last_token_start].trim_end().len();
     }
     let selector_text = src[content_start..selector_end].to_string();
-    let selector = if malformed {
-        None
+    let binds = selector_text.is_empty() || selector_text.starts_with('#');
+    let reference = if malformed {
+        Reference::Malformed
+    } else if binds {
+        match selector_text.strip_prefix('#') {
+            None => Reference::Inherited(None),
+            Some(location) if is_location(location) => {
+                Reference::Inherited(Some(location.to_string()))
+            }
+            Some(_) => Reference::Malformed,
+        }
     } else {
-        parse_selector(&selector_text)
+        parse_selector(&selector_text).map_or(Reference::Malformed, Reference::Selector)
     };
     Anchor {
         selector_text,
-        selector,
+        reference,
         digest,
         line,
+        start,
         selector_span: content_start..selector_end,
         digest_span,
         terminated: true,
+        binds,
     }
 }
 
@@ -407,14 +471,18 @@ pub fn parse_selector(text: &str) -> Option<Selector> {
         && path
             .split('/')
             .all(|segment| segment != "." && segment != "..");
-    let location_ok = location.is_none_or(|l| !l.trim().is_empty() && !l.contains(['\n', '\r']));
-    if !path_ok || !location_ok {
+    if !path_ok || !location.is_none_or(is_location) {
         return None;
     }
     Some(Selector {
         path: path.to_string(),
         location: location.map(str::to_string),
     })
+}
+
+/// A location: not blank, on one line.
+pub fn is_location(location: &str) -> bool {
+    !location.trim().is_empty() && !location.contains(['\n', '\r'])
 }
 
 pub struct LineIndex {

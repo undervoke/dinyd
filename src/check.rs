@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 use crate::Error;
-use crate::anchor::{self, Anchor, DocKind};
+use crate::anchor::{Anchor, DocKind, Reference};
 use crate::git::{self, Basis, Repo, Snapshot};
 use crate::link;
 use crate::target::{self, Failure};
@@ -80,13 +80,14 @@ pub fn check(repo: &Repo, basis: Basis, scope: Scope) -> Result<Vec<Finding>, Er
     for doc in snapshot.documents() {
         let kind = DocKind::of(&doc).unwrap();
         let source = String::from_utf8_lossy(&snapshot.read(&doc)?).into_owned();
-        for anchor in anchor::scan(kind, &source) {
+        let references = link::references(&doc, kind, &source);
+        for anchor in &references.anchors {
             if let Some(changed) = &changed
-                && !selected(&anchor, &doc, changed)
+                && !selected(anchor, &doc, changed)
             {
                 continue;
             }
-            let (verdict, reason) = judge(&snapshot, &anchor)?;
+            let (verdict, reason) = judge(&snapshot, anchor)?;
             if verdict != Verdict::Ok {
                 findings.push(Finding {
                     doc: doc.clone(),
@@ -96,21 +97,24 @@ pub fn check(repo: &Repo, basis: Basis, scope: Scope) -> Result<Vec<Finding>, Er
                 });
             }
         }
-        if kind != DocKind::Markdown {
-            continue;
-        }
         // Without line numbers, repeats of one destination would print identical lines.
         let mut reported = BTreeSet::new();
-        for link in link::scan(&doc, &source) {
+        for link in &references.links {
+            let Some(target) = &link.target else {
+                continue;
+            };
+            if link.end.is_some_and(|end| references.bound.contains(&end)) {
+                continue;
+            }
             if let Some(changed) = &changed
-                && !match &link.target {
+                && !match target {
                     Ok(target) => touches(changed, &doc, &target.path),
                     Err(_) => changed.contains(&doc),
                 }
             {
                 continue;
             }
-            if let Some(reason) = link::judge(&snapshot, &link)
+            if let Some(reason) = link::judge(&snapshot, target)
                 && reported.insert(link.written.clone())
             {
                 findings.push(Finding {
@@ -126,10 +130,12 @@ pub fn check(repo: &Repo, basis: Basis, scope: Scope) -> Result<Vec<Finding>, Er
 }
 
 fn selected(anchor: &Anchor, doc: &str, changed: &BTreeSet<String>) -> bool {
-    let Some(selector) = &anchor.selector else {
-        return true;
-    };
-    touches(changed, doc, &selector.path)
+    match &anchor.reference {
+        Reference::Selector(selector) => touches(changed, doc, &selector.path),
+        // A bound link that supplies no file changes only with its document.
+        Reference::Unresolved { .. } => changed.contains(doc),
+        Reference::Inherited(_) | Reference::Malformed => true,
+    }
 }
 
 /// Whether the document, the target path, or anything under it changed.
@@ -149,9 +155,13 @@ fn touches(changed: &BTreeSet<String>, doc: &str, path: &str) -> bool {
 }
 
 pub fn judge(snapshot: &Snapshot, anchor: &Anchor) -> Result<(Verdict, Option<String>), Error> {
-    // Malformed anchors, including every declaration scan yields, have no selector.
-    let Some(selector) = &anchor.selector else {
-        return Ok((Verdict::Malformed, None));
+    let selector = match &anchor.reference {
+        Reference::Selector(selector) => selector,
+        Reference::Unresolved { reason, .. } => {
+            return Ok((Verdict::Unresolved, Some(reason.clone())));
+        }
+        // Every declaration scan yields, and a path-less anchor that follows no link.
+        Reference::Inherited(_) | Reference::Malformed => return Ok((Verdict::Malformed, None)),
     };
     let recorded = anchor.digest.as_ref();
     let result =

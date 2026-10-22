@@ -21,6 +21,7 @@ flowchart LR
 
   Claim -->|digest anchor| Evidence["selected evidence<br/><small>code region · document unit · file</small>"]
   Dest -->|local link · import| Path["referenced path<br/><small>file · directory</small>"]
+  Dest -->|path of a bound digest anchor| Evidence
 
   classDef em fill:#173d25,stroke:#86efac
   class Claim em

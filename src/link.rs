@@ -1,17 +1,22 @@
-//! Links: every repo-local destination a Markdown document links or imports must exist.
+//! Links: every repo-local destination a Markdown document links or imports must exist, and a
+//! path-less anchor takes its path from the link it follows.
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Range;
 
 use pulldown_cmark::{Event, LinkType, Options, Parser, Tag};
 
-use crate::anchor;
+use crate::anchor::{self, Anchor, DocKind, Reference, Selector, escape};
 use crate::git::{Lookup, Snapshot};
 
 pub struct Link {
     /// The destination as written.
     pub written: String,
-    /// The repository path it names, or why it names none.
-    pub target: Result<Target, String>,
+    /// The offset just past a link or image usage; `None` for an `@import`.
+    pub end: Option<usize>,
+    /// The repository path it names, or why it names none; `None` for a URL or a destination
+    /// that is only a fragment or query.
+    pub target: Option<Result<Target, String>>,
 }
 
 pub struct Target {
@@ -28,22 +33,69 @@ impl Link {
     }
 }
 
-/// Control characters escaped, so that a destination never breaks an output line.
-fn escape(text: &str) -> String {
-    text.chars()
-        .map(|c| {
-            if c.is_control() {
-                c.escape_default().to_string()
-            } else {
-                c.to_string()
-            }
-        })
-        .collect()
+/// A document's anchors, each path-less one bound to the link it follows, and its links.
+pub struct References {
+    pub anchors: Vec<Anchor>,
+    pub links: Vec<Link>,
+    /// Ends of the link usages that anchors bound; the anchor judges such a usage.
+    pub bound: BTreeSet<usize>,
 }
 
-/// Repo-local link and image destinations and `@import` operands of the Markdown document at
-/// `doc`, in document order. URLs, same-document fragments, and anything in code, frontmatter,
-/// or raw HTML are not links.
+pub fn references(doc: &str, kind: DocKind, src: &str) -> References {
+    let links = match kind {
+        DocKind::Markdown => scan(doc, src),
+        DocKind::Mermaid => Vec::new(),
+    };
+    let mut anchors = anchor::scan(kind, src);
+    let bound = bind(&mut anchors, &links, src);
+    References {
+        anchors,
+        links,
+        bound,
+    }
+}
+
+/// Binds each path-less anchor to the link usage that ends right before its comment, with only
+/// spaces or tabs between, and returns those usages' ends. A bound anchor inherits the usage's
+/// path; a destination that supplies no repository file leaves it unresolved.
+fn bind(anchors: &mut [Anchor], links: &[Link], src: &str) -> BTreeSet<usize> {
+    let usages: BTreeMap<usize, &Link> = links
+        .iter()
+        .filter_map(|link| link.end.map(|end| (end, link)))
+        .collect();
+    let mut bound = BTreeSet::new();
+    for anchor in anchors.iter_mut().filter(|a| a.binds) {
+        let end = src[..anchor.start].trim_end_matches([' ', '\t']).len();
+        let Some(link) = usages.get(&end) else {
+            continue;
+        };
+        bound.insert(end);
+        let Reference::Inherited(location) = &anchor.reference else {
+            continue;
+        };
+        let location = location.clone();
+        anchor.reference = match &link.target {
+            Some(Ok(target)) if !target.dir && !target.path.is_empty() => {
+                Reference::Selector(Selector {
+                    path: target.path.clone(),
+                    location,
+                })
+            }
+            target => Reference::Unresolved {
+                written: link.written.clone(),
+                reason: match target {
+                    None => "names no repository path".to_string(),
+                    Some(Err(reason)) => reason.clone(),
+                    Some(Ok(_)) => "a digest anchor needs a file".to_string(),
+                },
+            },
+        };
+    }
+    bound
+}
+
+/// Link and image destinations and `@import` operands of the Markdown document at `doc`, in
+/// document order. Anything in code, frontmatter, or raw HTML is not a link.
 pub fn scan(doc: &str, src: &str) -> Vec<Link> {
     let mut found: Vec<(usize, Link)> = Vec::new();
     // Where an `@import` line is not one: code, frontmatter, and raw HTML, comments included.
@@ -74,26 +126,41 @@ pub fn scan(doc: &str, src: &str) -> Vec<Link> {
                 link_type,
                 LinkType::Inline | LinkType::Reference | LinkType::Collapsed | LinkType::Shortcut
             )
-            && let Some(target) = link_target(doc, &dest_url)
         {
+            let target = link_target(doc, &dest_url);
             let written = dest_url.into_string();
-            found.push((range.start, Link { written, target }));
+            let end = Some(range.end);
+            found.push((
+                range.start,
+                Link {
+                    written,
+                    end,
+                    target,
+                },
+            ));
         }
     }
     for (offset, operand) in imports(src, &excluded) {
         if !operand.is_empty() && !is_url(operand) {
-            let target = resolve(doc, operand);
+            let target = Some(resolve(doc, operand));
             let written = operand.to_string();
-            found.push((offset, Link { written, target }));
+            found.push((
+                offset,
+                Link {
+                    written,
+                    end: None,
+                    target,
+                },
+            ));
         }
     }
     found.sort_by_key(|(offset, _)| *offset);
     found.into_iter().map(|(_, link)| link).collect()
 }
 
-/// Why the link's target is missing from the snapshot, or `None` when it exists.
-pub fn judge(snapshot: &Snapshot, link: &Link) -> Option<String> {
-    let target = match &link.target {
+/// Why a link's target is missing from the snapshot, or `None` when it exists.
+pub fn judge(snapshot: &Snapshot, target: &Result<Target, String>) -> Option<String> {
+    let target = match target {
         Ok(target) => target,
         Err(reason) => return Some(reason.clone()),
     };
