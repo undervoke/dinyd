@@ -6,7 +6,7 @@ The guard reads current working-tree bytes because those are the bytes the tool 
 ## Protected source
 
 Markdown uses `<!-- dinyd-lock -->` and `<!-- /dinyd-lock -->`; Mermaid documents use own-line `%% dinyd-lock` and `%% /dinyd-lock`.
-The [literal-example exclusions](../README.md#anchors) apply to these markers as well.
+The [literal-example exclusions](../README.md#anchors)<!-- dinyd: #literal-examples d1:c2ae28d796e31f7d --> apply to these markers as well.
 A lock protects both boundary comments and the enclosed bytes; multiple and nested locks need no identifiers.
 Protection follows the source within its file, so an intact span may move inside that file, while deleting or moving the locked file is denied.
 Existing protected spans must survive byte-for-byte, in relative order, as recognized locks.
@@ -20,11 +20,11 @@ Lock markers follow unit-marker projection in `d1`, keeping the protection decla
 
 ## Host boundary
 
-The supported hosts are [Claude Code](https://code.claude.com/docs/en/hooks), [Codex Desktop](https://learn.chatgpt.com/docs/hooks), [OpenCode v1 and v2](https://opencode.ai/v2/docs/build/plugins/migrate-v1/), [Cursor Agent](https://cursor.com/docs/hooks), [Pi](https://pi.dev/docs/latest/extensions), and [current Kilo Code](https://kilo.ai/docs/automate/extending/plugins).
+The supported hosts are <!-- dinyd-id: supported-hosts -->[Claude Code](https://code.claude.com/docs/en/hooks), [Codex Desktop](https://learn.chatgpt.com/docs/hooks), [OpenCode v1 and v2](https://opencode.ai/v2/docs/build/plugins/migrate-v1/), [Cursor Agent](https://cursor.com/docs/hooks), [Pi](https://pi.dev/docs/latest/extensions), and [current Kilo Code](https://kilo.ai/docs/automate/extending/plugins)<!-- /dinyd-id: supported-hosts -->.
 Orca uses the binding of the agent it launches.
 Adapters translate native tool calls and denials; lock policy and edit reconstruction belong to the Rust runtime.
 Plugin adapters run in the host's existing JavaScript runtime, preserving native-binary installation for the consuming project.
-OpenCode v1 >= 1.18.29 and v2 share one adapter with both `server` and `setup`, so installing both generations cannot double-run the guard.
+OpenCode v1 >= 1.18.29 and v2 share one adapter with both `server` and `setup`, so installing both generations cannot double-run the guard. <!-- dinyd: templates/opencode-dinyd-guard.ts s1:e57e44f6ceb8d0ce -->
 Cursor presents edits as full-content `Write` calls and delivers a denial's agent instruction through `user_message`; Tab edits are outside this Agent-tool boundary.
 [Installation](installation.md) owns project context and activation, including the host's trust requirements.
 

@@ -50,7 +50,7 @@ shasum -a 256 -c "dinyd-$t.tar.xz.sha256"
 tar -xJf "dinyd-$t.tar.xz"   # binary at dinyd-$t/dinyd
 ```
 
-With Rust 1.93.0 or later and a C build toolchain,
+With <!-- dinyd-id: minimum-rust -->Rust 1.93.0<!-- /dinyd-id: minimum-rust --> or later and a C build toolchain,
 `cargo install --locked --git https://github.com/undervoke/dinyd --tag v0.4.0`
 builds the same version from source. The prebuilt archives need neither.
 
@@ -105,8 +105,8 @@ Passwords are verified in constant time. <!-- dinyd: src/Hasher.cs#PasswordHashe
 `dinyd:` is a **digest anchor**: the claim restates facts of the target, and
 the digest records the target as it was when the claim was last judged.
 
-Documents are tracked Markdown files (and [Mermaid](#mermaid) files). An
-anchor is an HTML comment anywhere outside code blocks and inline code.
+Documents are tracked Markdown files (and [Mermaid](#mermaid) files). <!-- dinyd-id: literal-examples -->An
+anchor is an HTML comment anywhere outside code blocks and inline code.<!-- /dinyd-id: literal-examples -->
 
 ### Document units
 
@@ -137,19 +137,21 @@ Read [Checks](verification/checks.md), then the [migrations](../../db/migrations
 @import "checks.csv"
 ```
 
+<!-- dinyd-id: link-resolution -->
 - A link destination is relative to the document's directory, as the
   renderer reads it; a leading `/` starts at the repository root. Selectors,
   by contrast, are always repository-root paths.
 - Its `?query` and `#fragment` are ignored, and the rest is percent-decoded
   once. An `@import` path is taken literally.
 - A trailing `/` asks for a directory; without one, a file or a directory
-  will do. A path that climbs above the repository root does not resolve.
+  will do. A path that climbs above the repository root does not resolve.<!-- /dinyd-id: link-resolution -->
 - URLs, same-document `#fragment` links, and anything in code, frontmatter,
   or raw HTML (an HTML comment included) are not checked. To mention a path
   that should not be checked, write it as inline code.
 
 ### Bound anchors
 
+<!-- dinyd-id: bound-anchors -->
 A digest anchor whose selector names no path takes the path of the Markdown
 link or image right before it; only spaces or tabs may stand between them:
 
@@ -163,7 +165,7 @@ See [workspace departments](adr/031.md#L30-L45)<!-- dinyd: #departments d1:5be0c
 - A path-less anchor that follows no link is malformed.
 - check prints a bound anchor's selector, and digest's `--expect-selector`
   takes it, as the repository path and location, such as
-  `docs/ADR Notes.md#departments`.
+  `docs/ADR Notes.md#departments`.<!-- /dinyd-id: bound-anchors -->
 
 ### Selectors
 
