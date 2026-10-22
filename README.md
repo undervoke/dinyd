@@ -288,9 +288,9 @@ target did not resolve goes to stderr.
 dinyd apply <doc> --line <n> --selector <selector> [--bytes] [--index | --worktree | --rev <commit>]
 ```
 
-Writes one anchor with its mode and first digest. The first link ending on
-line `n` that names the selector's path takes the anchor; with no such link,
-or when that link is already bound, it goes at the end of line `n`. It prints
+Writes one anchor with its mode and first digest. The first unbound link
+ending on line `n` that names the selector's path takes the anchor; with no
+such link, it goes at the end of line `n`. It prints
 the anchor and names the view the target was read from. It refuses, writing
 nothing, when the target does not resolve, the same anchor is already there,
 or check's parser would not read the written anchor back, as inside a code

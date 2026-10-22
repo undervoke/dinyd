@@ -121,40 +121,42 @@ pub fn apply(repo: &Repo, request: ApplyRequest) -> Result<(String, String), Err
     Ok((text, basis))
 }
 
-/// Where the anchor goes and what it selects. The first link usage ending on `line` whose path
-/// the selector names takes the anchor, which then inherits that path; if an anchor is already
-/// bound there, the new one goes to the end of the line with its path written out.
+/// Where the anchor goes and what it selects. The first unbound link usage ending on `line` whose
+/// path the selector names takes the anchor, which then inherits that path; if every such usage
+/// is already bound, the new one goes to the end of the line with its path written out.
 fn place(
     references: &References,
     lines: &LineIndex,
     line: usize,
     text: &str,
 ) -> Result<(Placement, Selector), Error> {
-    let first = references.links.iter().find_map(|link| {
-        let end = link.end?;
-        let Some(Ok(target)) = &link.target else {
-            return None;
-        };
-        if target.dir || target.path.is_empty() || lines.line(end - 1) != line {
-            return None;
-        }
-        // Matched as text: a decoded path may hold spaces or `#`.
-        let location = match text.strip_prefix(target.path.as_str())? {
-            "" => None,
-            rest => Some(rest.strip_prefix('#').filter(|l| anchor::is_location(l))?),
-        };
-        let selector = Selector {
-            path: target.path.clone(),
-            location: location.map(str::to_string),
-        };
-        Some((end, selector))
-    });
-    match first {
+    let matching = || {
+        references.links.iter().filter_map(|link| {
+            let end = link.end?;
+            let Some(Ok(target)) = &link.target else {
+                return None;
+            };
+            if target.dir || target.path.is_empty() || lines.line(end - 1) != line {
+                return None;
+            }
+            // Matched as text: a decoded path may hold spaces or `#`.
+            let location = match text.strip_prefix(target.path.as_str())? {
+                "" => None,
+                rest => Some(rest.strip_prefix('#').filter(|l| anchor::is_location(l))?),
+            };
+            let selector = Selector {
+                path: target.path.clone(),
+                location: location.map(str::to_string),
+            };
+            Some((end, selector))
+        })
+    };
+    if let Some((end, selector)) = matching().find(|(end, _)| !references.bound.contains(end)) {
+        return Ok((Placement::Bound(end), selector));
+    }
+    match matching().next() {
         // The read-back check refuses an end-of-line text that selects anything else.
-        Some((end, selector)) if references.bound.contains(&end) => {
-            Ok((Placement::Standalone, selector))
-        }
-        Some((end, selector)) => Ok((Placement::Bound(end), selector)),
+        Some((_, selector)) => Ok((Placement::Standalone, selector)),
         None => anchor::parse_selector(text)
             .map(|selector| (Placement::Standalone, selector))
             .ok_or_else(|| Error::Usage(format!("malformed selector: {text}"))),
