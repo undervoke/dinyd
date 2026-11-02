@@ -150,7 +150,10 @@ pub enum Keyword {
     LockStart,
     /// `/dinyd-lock` — a lock boundary closing a protected span.
     LockEnd,
+    Ignore,
 }
+
+pub const LINK_IGNORE: &str = "<!-- dinyd-ignore -->";
 
 const KEYWORDS: [(&str, Keyword); 5] = [
     ("dinyd:", Keyword::Digest),
@@ -165,6 +168,9 @@ impl Comment {
     pub fn keyword(&self, src: &str) -> Option<(Keyword, usize)> {
         let text = &src[self.body.clone()];
         let lead = text.len() - text.trim_start().len();
+        if &src[self.extent.clone()] == LINK_IGNORE {
+            return Some((Keyword::Ignore, self.body.start + text.trim_end().len()));
+        }
         KEYWORDS
             .iter()
             .find(|(word, _)| text[lead..].starts_with(word))
@@ -204,8 +210,7 @@ impl Comment {
             Keyword::Digest => {
                 parse_reference(src, rest..self.body.end, self.line, self.extent.start)
             }
-            // Lock markers are protection metadata, never evidence references.
-            Keyword::LockStart | Keyword::LockEnd => return None,
+            Keyword::LockStart | Keyword::LockEnd | Keyword::Ignore => return None,
             Keyword::Start | Keyword::End => {
                 if self.declaration(src).is_some() {
                     return None;

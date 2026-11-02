@@ -449,6 +449,20 @@ fn comments_and_frontmatter_hold_no_links() {
 }
 
 #[test]
+fn ignore_marks_one_link_usage_even_when_destinations_repeat() {
+    let repo = Repo::new();
+    repo.write(
+        "doc.md",
+        "[sample](sample.py)<!-- dinyd-ignore --> [example](missing.md)<!-- dinyd-ignore --> [real](missing.md)\n",
+    );
+    repo.git(&["add", "doc.md"]);
+    assert_eq!(
+        repo.check(&[]).lines(),
+        [format!("doc.md → link missing.md: {UNRESOLVED}")]
+    );
+}
+
+#[test]
 fn a_link_naming_no_path_is_selected_only_with_its_document() {
     let repo = Repo::new();
     repo.write("a.md", "a\n");

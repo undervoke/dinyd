@@ -1,8 +1,12 @@
 # Changelog
 
-User-facing changes and upgrade notes for released versions of DinyD.
+User-facing changes and upgrade notes for DinyD.
 
 For a project with `.dinyd-version`, `dinyd init --version <version>` selects the release and regenerates its selected host bindings. `dinyd update` upgrades the installed executable while preserving the project pin.
+
+## Unreleased
+
+- Place `<!-- dinyd-ignore -->` after a Markdown link to skip the path existence check for that occurrence.
 
 ## 0.5.0
 

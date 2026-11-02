@@ -103,7 +103,8 @@ pub fn check(repo: &Repo, basis: Basis, scope: Scope) -> Result<Vec<Finding>, Er
             let Some(target) = &link.target else {
                 continue;
             };
-            if link.end.is_some_and(|end| references.bound.contains(&end)) {
+            if link.ignore_path_check || link.end.is_some_and(|end| references.bound.contains(&end))
+            {
                 continue;
             }
             if let Some(changed) = &changed

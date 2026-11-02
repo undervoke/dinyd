@@ -14,6 +14,7 @@ pub struct Link {
     pub written: String,
     /// The offset just past a link or image usage; `None` for an `@import`.
     pub end: Option<usize>,
+    pub ignore_path_check: bool,
     /// The repository path it names, or why it names none; `None` for a URL or a destination
     /// that is only a fragment or query.
     pub target: Option<Result<Target, String>>,
@@ -110,6 +111,7 @@ pub fn scan(doc: &str, src: &str) -> Vec<Link> {
         ) {
             excluded.push(range.clone());
         }
+        let is_link = matches!(event, Event::Start(Tag::Link { .. }));
         if let Event::Start(
             Tag::Link {
                 link_type,
@@ -135,6 +137,10 @@ pub fn scan(doc: &str, src: &str) -> Vec<Link> {
                 Link {
                     written,
                     end,
+                    ignore_path_check: is_link
+                        && src[range.end..]
+                            .trim_start_matches([' ', '\t'])
+                            .starts_with(anchor::LINK_IGNORE),
                     target,
                 },
             ));
@@ -149,6 +155,7 @@ pub fn scan(doc: &str, src: &str) -> Vec<Link> {
                 Link {
                     written,
                     end: None,
+                    ignore_path_check: false,
                     target,
                 },
             ));

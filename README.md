@@ -150,6 +150,10 @@ Read [Checks](verification/checks.md), then the [migrations](../../db/migrations
 - URLs, same-document `#fragment` links, and anything in code, frontmatter,
   or raw HTML (an HTML comment included) are not checked. To mention a path
   that should not be checked, write it as inline code.
+- To show a Markdown link without checking whether its path exists, put
+  `<!-- dinyd-ignore -->` immediately after that link usage (spaces or tabs
+  may separate them): `[app.py](/abs/path/app.py:12)<!-- dinyd-ignore -->`.
+  Other uses of the same destination are checked independently.
 
 ### Bound anchors
 
@@ -256,7 +260,7 @@ writes or Cursor Tab completions. It is an editing guardrail, not a sandbox.
 dinyd check [--index | --worktree | --rev <commit>] [--changed [--base <rev>]]
 ```
 
-Judges every anchor and local link destination and prints one line per
+Judges every anchor and the local destinations described in [Links](#links), and prints one line per
 failure; exit 1 if any fail.
 
 ```
