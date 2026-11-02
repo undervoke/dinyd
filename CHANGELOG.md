@@ -4,9 +4,17 @@ User-facing changes and upgrade notes for DinyD.
 
 For a project with `.dinyd-version`, `dinyd init --version <version>` selects the release and regenerates its selected host bindings. `dinyd update` upgrades the installed executable while preserving the project pin.
 
-## Unreleased
+## 0.6.0
 
-- Place `<!-- dinyd-ignore -->` after a Markdown link to skip the path existence check for that occurrence.
+### Added
+
+- Place `<!-- dinyd-ignore -->` after a Markdown link to skip the path existence check for that occurrence. Other uses of the same destination are still checked.
+
+### Upgrade notes
+
+- For a pinned project, select this release with [`dinyd init --version 0.6.0`](https://github.com/undervoke/dinyd/blob/v0.6.0/README.md#project-setup-and-versions) to use per-link ignore markers.
+
+[Full changes](https://github.com/undervoke/dinyd/compare/v0.5.0...v0.6.0) · [Version documentation](https://github.com/undervoke/dinyd/blob/v0.6.0/README.md)
 
 ## 0.5.0
 
