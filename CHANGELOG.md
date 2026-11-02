@@ -4,6 +4,14 @@ User-facing changes and upgrade notes for DinyD.
 
 For a project with `.dinyd-version`, `dinyd init --version <version>` selects the release and regenerates its selected host bindings. `dinyd update` upgrades the installed executable while preserving the project pin.
 
+## 0.6.1
+
+### Added
+
+- DinyD is published to npm as `@undervoke/dinyd`, so a JavaScript project can pin it as a dev dependency. Agent-host bindings still call `dinyd` on PATH.
+
+[Full changes](https://github.com/undervoke/dinyd/compare/v0.6.0...v0.6.1) · [Version documentation](https://github.com/undervoke/dinyd/blob/v0.6.1/README.md)
+
 ## 0.6.0
 
 ### Added
