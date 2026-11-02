@@ -4,7 +4,7 @@ User-facing changes and upgrade notes for DinyD.
 
 For a project with `.dinyd-version`, `dinyd init --version <version>` selects the release and regenerates its selected host bindings. `dinyd update` upgrades the installed executable while preserving the project pin.
 
-## Unreleased
+## 0.7.0
 
 ### Added
 
@@ -13,6 +13,8 @@ For a project with `.dinyd-version`, `dinyd init --version <version>` selects th
 ### Upgrade notes
 
 - To move a project to the npm pin, add the dev dependency, install it, and run `pnpm exec dinyd init`.
+
+[Full changes](https://github.com/undervoke/dinyd/compare/v0.6.1...v0.7.0) · [Version documentation](https://github.com/undervoke/dinyd/blob/v0.7.0/README.md)
 
 ## 0.6.1
 
