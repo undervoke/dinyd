@@ -12,6 +12,8 @@ DinyD also protects human-owned document spans through agent file-edit
 hooks. The project chooses where to run check (a pre-commit hook, CI, or an
 agent's routine).
 
+See the [changelog](CHANGELOG.md) for version changes and upgrade notes.
+
 ## Install
 
 macOS and Linux:
