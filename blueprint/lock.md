@@ -24,7 +24,7 @@ The supported hosts are <!-- dinyd-id: supported-hosts -->[Claude Code](https://
 Orca uses the binding of the agent it launches.
 Adapters translate native tool calls and denials; lock policy and edit reconstruction belong to the Rust runtime.
 Plugin adapters run in the host's existing JavaScript runtime, preserving native-binary installation for the consuming project.
-OpenCode v1 >= 1.18.29 and v2 share one adapter with both `server` and `setup`, so installing both generations cannot double-run the guard. <!-- dinyd: templates/opencode-dinyd-guard.ts s1:e57e44f6ceb8d0ce -->
+OpenCode v1 >= 1.18.29 and v2 share one adapter with both `server` and `setup`, so installing both generations cannot double-run the guard. <!-- dinyd: templates/opencode-dinyd-guard.ts s1:7f89e25c4a246fb2 -->
 Cursor presents edits as full-content `Write` calls and delivers a denial's agent instruction through `user_message`; Tab edits are outside this Agent-tool boundary.
 [Installation](installation.md) owns project context and activation, including the host's trust requirements.
 

@@ -69,8 +69,7 @@ pnpm add -D --save-exact @undervoke/dinyd
 The package's install script downloads the platform archive from GitHub
 Releases without verifying its checksum, so installation needs network
 access. pnpm 10 runs that script only for a package listed in
-`onlyBuiltDependencies` or `allowBuilds`. Run it with `pnpm exec dinyd`;
-agent-host bindings still call `dinyd` on PATH.
+`onlyBuiltDependencies` or `allowBuilds`. Run it with `pnpm exec dinyd`.
 
 ### Project setup and versions
 
@@ -84,6 +83,12 @@ checklist. Existing DinyD registrations are preselected. Commit the pin and
 generated project settings so clones use the same version and bindings.
 A clone runs `dinyd init` to prepare its pinned runtime; ordinary setup keeps
 the existing pin.
+
+When the Git root's `package.json` depends on `@undervoke/dinyd`, that
+dependency pins the version instead. Run `pnpm exec dinyd init`: init removes
+`.dinyd-version` and writes bindings that run `pnpm exec dinyd`, or
+`npm exec --no -- dinyd` without a `pnpm-lock.yaml`, so a clone needs only its
+dependency install. Change the version with the package manager.
 
 ```sh
 dinyd init --hosts claude-code,codex,cursor

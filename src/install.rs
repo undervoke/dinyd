@@ -25,8 +25,69 @@ const HOST_LABELS: [&str; 6] = [
 
 /// Marks a plugin file as DinyD-owned. Every adapter template carries it.
 const MANAGED_MARKER: &str = "dinyd-guard: managed by";
-/// A hook registration is DinyD-owned when its command starts with this.
-const GUARD_PREFIX: &str = "dinyd guard";
+/// npm package whose dependency in the Git root's package.json replaces
+/// `.dinyd-version` as the project's version pin.
+pub const NPM_PACKAGE: &str = "@undervoke/dinyd";
+/// Launcher line in every plugin template; init rewrites it per project.
+const TEMPLATE_LAUNCHER: &str = r#"const DINYD = ["dinyd"];"#;
+
+/// How host bindings start the guard: `dinyd` on PATH, or the project's
+/// package manager running its installed package.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Launcher {
+    Path,
+    Pnpm,
+    Npm,
+}
+
+impl Launcher {
+    /// Command words before `guard`.
+    fn words(self) -> &'static [&'static str] {
+        match self {
+            Launcher::Path => &["dinyd"],
+            Launcher::Pnpm => &["pnpm", "exec", "dinyd"],
+            Launcher::Npm => &["npm", "exec", "--no", "--", "dinyd"],
+        }
+    }
+
+    fn command(self) -> String {
+        self.words().join(" ")
+    }
+}
+
+/// True when the Git root's package.json depends on [`NPM_PACKAGE`].
+pub fn npm_pinned(root: &Path) -> Result<bool, Error> {
+    let path = root.join("package.json");
+    let text = match std::fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(e) => return Err(Error::Read(format!("package.json: {e}"))),
+    };
+    let manifest: serde_json::Value =
+        serde_json::from_str(&text).map_err(|e| Error::Read(format!("package.json: {e}")))?;
+    Ok(["dependencies", "devDependencies"]
+        .iter()
+        .any(|field| manifest[field].get(NPM_PACKAGE).is_some()))
+}
+
+fn launcher(root: &Path) -> Result<Launcher, Error> {
+    if !npm_pinned(root)? {
+        return Ok(Launcher::Path);
+    }
+    Ok(if root.join("pnpm-lock.yaml").exists() {
+        Launcher::Pnpm
+    } else {
+        Launcher::Npm
+    })
+}
+
+/// A hook registration is DinyD-owned when its command starts any
+/// launcher's guard, so switching launchers replaces the old entry.
+fn is_guard_command(command: &str) -> bool {
+    [Launcher::Path, Launcher::Pnpm, Launcher::Npm]
+        .iter()
+        .any(|launcher| command.starts_with(&format!("{} guard", launcher.command())))
+}
 
 const PIN_FILE: &str = ".dinyd-version";
 
@@ -41,7 +102,13 @@ pub fn init(version: Option<&str>, hosts: Option<&str>) -> Result<(), Error> {
 
     let running = env!("CARGO_PKG_VERSION");
     let pin_path = root.join(PIN_FILE);
-    let pinned = crate::runtime::read_pin(&root)?.map(|version| version.to_string());
+    let launcher = launcher(&root)?;
+    let npm = launcher != Launcher::Path;
+    let pinned = if npm {
+        None
+    } else {
+        crate::runtime::read_pin(&root)?.map(|version| version.to_string())
+    };
     let selected = match version {
         Some(exact) if exact == running => running.to_string(),
         Some(exact) => {
@@ -71,38 +138,45 @@ pub fn init(version: Option<&str>, hosts: Option<&str>) -> Result<(), Error> {
             )));
         }
     }
-    crate::download::fetch_release(
-        &crate::download::parse_version(&selected)?,
-        crate::download::build_target(),
-    )?;
+    if !npm {
+        crate::download::fetch_release(
+            &crate::download::parse_version(&selected)?,
+            crate::download::build_target(),
+        )?;
+    }
 
     // An explicit selection that matches the pin, and ordinary setup with an
     // existing pin, both leave the file alone: a fresh clone must not acquire
     // an unrelated version change. (Production dispatch already delegated to
-    // the pin, so the running version equals it.)
-    let pin_status = if pinned.as_deref() == Some(selected.as_str()) {
-        "unchanged"
+    // the pin, so the running version equals it.) Under a package.json pin a
+    // leftover file would make dispatch select another runtime, so it goes.
+    let pin_status = if npm {
+        match std::fs::remove_file(&pin_path) {
+            Ok(()) => "removed; package.json pins the version".to_string(),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                "unused; package.json pins the version".to_string()
+            }
+            Err(e) => return Err(Error::Read(format!("{PIN_FILE}: {e}"))),
+        }
+    } else if pinned.as_deref() == Some(selected.as_str()) {
+        format!("unchanged {selected}")
     } else {
         write_text(&pin_path, &format!("{selected}\n"))?;
         if pinned.is_none() {
-            "created"
+            format!("created {selected}")
         } else {
-            "updated"
+            format!("updated {selected}")
         }
     };
 
     let mut report: Vec<(String, String, String)> = Vec::new();
-    report.push((
-        "pin".to_string(),
-        PIN_FILE.to_string(),
-        format!("{pin_status} {selected}"),
-    ));
+    report.push(("pin".to_string(), PIN_FILE.to_string(), pin_status));
     for slug in HOST_SLUGS {
         let selected_host = wanted.contains(slug);
         let status = if is_json_host(slug) {
-            sync_json_host(&root, &json, slug, selected_host)?
+            sync_json_host(&root, &json, slug, selected_host, launcher)?
         } else {
-            sync_plugin_host(&root, &plugins, slug, selected_host)?
+            sync_plugin_host(&root, &plugins, slug, selected_host, launcher)?
         };
         report.push((slug.to_string(), host_path(slug).to_string(), status));
     }
@@ -111,7 +185,14 @@ pub fn init(version: Option<&str>, hosts: Option<&str>) -> Result<(), Error> {
     for (_, path, status) in &report {
         println!("{path}: {status}");
     }
-    println!("PATH: hosts must resolve `dinyd` on PATH; re-run init after moving the binary.");
+    if npm {
+        println!(
+            "Hosts run `{}`; install the project's dependencies in each clone.",
+            launcher.command()
+        );
+    } else {
+        println!("PATH: hosts must resolve `dinyd` on PATH; re-run init after moving the binary.");
+    }
     println!("Hosts read settings when a session starts; open a new session to activate them.");
     if wanted.contains("codex") {
         println!("Codex: trust the project hooks in /hooks before they run.");
@@ -252,17 +333,19 @@ fn host_matcher(slug: &str) -> &str {
     }
 }
 
-fn guard_command(slug: &str) -> String {
-    format!("{GUARD_PREFIX} --host {slug}")
+fn guard_command(slug: &str, launcher: Launcher) -> String {
+    format!("{} guard --host {slug}", launcher.command())
 }
 
-fn plugin_template(slug: &str) -> &'static str {
-    match slug {
+fn plugin_template(slug: &str, launcher: Launcher) -> String {
+    let template = match slug {
         "opencode" => include_str!("../templates/opencode-dinyd-guard.ts"),
         "pi" => include_str!("../templates/pi-dinyd-guard.ts"),
         "kilo" => include_str!("../templates/kilo-dinyd-guard.ts"),
         _ => unreachable!("json host has no template"),
-    }
+    };
+    let words = serde_json::to_string(launcher.words()).expect("launcher words serialize");
+    template.replace(TEMPLATE_LAUNCHER, &format!("const DINYD = {words};"))
 }
 
 struct Preflight {
@@ -402,7 +485,7 @@ fn entry_is_dinyd(entry: &serde_json::Value) -> bool {
     if entry
         .get("command")
         .and_then(|command| command.as_str())
-        .is_some_and(|command| command.starts_with(GUARD_PREFIX))
+        .is_some_and(is_guard_command)
     {
         return true;
     }
@@ -420,8 +503,8 @@ fn has_dinyd_registration(slug: &str, value: &serde_json::Value) -> bool {
 }
 
 /// The canonical hook entry for a selected host.
-fn canonical_entry(slug: &str) -> serde_json::Value {
-    let command = guard_command(slug);
+fn canonical_entry(slug: &str, launcher: Launcher) -> serde_json::Value {
+    let command = guard_command(slug, launcher);
     match slug {
         "cursor" => serde_json::json!({
             "command": command,
@@ -435,8 +518,8 @@ fn canonical_entry(slug: &str) -> serde_json::Value {
     }
 }
 
-fn canonical_hook(slug: &str) -> serde_json::Value {
-    serde_json::json!({"type": "command", "command": guard_command(slug)})
+fn canonical_hook(slug: &str, launcher: Launcher) -> serde_json::Value {
+    serde_json::json!({"type": "command", "command": guard_command(slug, launcher)})
 }
 
 /// Merge the desired host state into its JSON value. Returns the value to
@@ -446,6 +529,7 @@ fn merged_json(
     slug: &str,
     current: Option<&serde_json::Value>,
     selected: bool,
+    launcher: Launcher,
 ) -> Option<serde_json::Value> {
     let mut root = current
         .cloned()
@@ -511,7 +595,7 @@ fn merged_json(
             return Some(root);
         };
         if slug == "cursor" {
-            list.push(canonical_entry(slug));
+            list.push(canonical_entry(slug, launcher));
         } else {
             match list
                 .iter_mut()
@@ -534,9 +618,9 @@ fn merged_json(
                     map.get_mut("hooks")
                         .and_then(|h| h.as_array_mut())
                         .unwrap()
-                        .push(canonical_hook(slug));
+                        .push(canonical_hook(slug, launcher));
                 }
-                None => list.push(canonical_entry(slug)),
+                None => list.push(canonical_entry(slug, launcher)),
             }
         }
     }
@@ -578,6 +662,7 @@ fn sync_json_host(
     preflight: &Preflight,
     slug: &str,
     selected: bool,
+    launcher: Launcher,
 ) -> Result<String, Error> {
     let rel = host_path(slug);
     let path = root.join(rel);
@@ -586,7 +671,7 @@ fn sync_json_host(
     if !selected && !current.is_some_and(|value| has_dinyd_registration(slug, value)) {
         return Ok("unchanged".to_string());
     }
-    let merged = merged_json(slug, current, selected);
+    let merged = merged_json(slug, current, selected, launcher);
     match (had_file, merged) {
         (false, None) => Ok("unchanged".to_string()),
         (true, None) => {
@@ -621,6 +706,7 @@ fn sync_plugin_host(
     preflight: &PluginPreflight,
     slug: &str,
     selected: bool,
+    launcher: Launcher,
 ) -> Result<String, Error> {
     let rel = host_path(slug);
     let path = root.join(rel);
@@ -631,17 +717,17 @@ fn sync_plugin_host(
         }
         (false, _) => Ok("unchanged".to_string()),
         (true, PluginState::Absent) => {
-            write_text(&path, plugin_template(slug))?;
+            write_text(&path, &plugin_template(slug, launcher))?;
             Ok("created".to_string())
         }
         (true, PluginState::Managed) => {
-            let template = plugin_template(slug);
+            let template = plugin_template(slug, launcher);
             let current =
                 std::fs::read_to_string(&path).map_err(|e| Error::Read(format!("{rel}: {e}")))?;
             if current == template {
                 Ok("unchanged".to_string())
             } else {
-                write_text(&path, template)?;
+                write_text(&path, &template)?;
                 Ok("updated".to_string())
             }
         }

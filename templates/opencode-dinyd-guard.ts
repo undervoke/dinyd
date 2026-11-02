@@ -5,17 +5,21 @@ import * as path from "node:path";
 const HOST = "opencode";
 const EDIT_TOOLS = new Set(["edit", "write", "apply_patch"]);
 const UNAVAILABLE = "dinyd guard unavailable; install dinyd and run dinyd init.";
+// Rewritten by 'dinyd init' to the package manager's exec when package.json pins dinyd.
+const DINYD = ["dinyd"];
 
 // Null allows the call; a string denies it with that reason.
 function judge(tool, args, worktree) {
   const payload = JSON.stringify({ tool: String(tool || "unknown"), args: args || {}, worktree }) + "\n";
   let run;
   try {
-    run = spawnSync("dinyd", ["guard", "--host", HOST], {
+    run = spawnSync(DINYD[0], [...DINYD.slice(1), "guard", "--host", HOST], {
       input: payload,
       encoding: "utf8",
       cwd: worktree,
       timeout: 30000,
+      // Package managers are .cmd shims on Windows, which Node starts only through a shell.
+      shell: process.platform === "win32" && DINYD.length > 1,
     });
   } catch {
     return UNAVAILABLE;

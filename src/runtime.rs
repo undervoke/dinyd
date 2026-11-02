@@ -102,6 +102,12 @@ fn dispatch_ordinary(args: &[OsString]) -> Result<Option<i32>, Error> {
 
 /// Setup is performed by the selected runtime so its pin and adapters agree.
 fn dispatch_init(args: &[OsString]) -> Result<Option<i32>, Error> {
+    // Under a package.json pin the package manager already selected this
+    // runtime; a leftover `.dinyd-version` must not divert init from it.
+    let cwd = std::env::current_dir().map_err(|e| Error::Read(e.to_string()))?;
+    if crate::install::npm_pinned(&project_root(&cwd)?)? {
+        return Ok(None);
+    }
     let Some(spec) = init_version_spec(args) else {
         return dispatch_ordinary(args);
     };

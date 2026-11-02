@@ -117,3 +117,37 @@ fn foreign_plugin_conflict_precedes_project_writes() {
         "export default function mine() {}\n"
     );
 }
+
+// A launcher change left the PATH guard beside the new one and kept a pin that diverts dispatch; retire when init stops converting PATH setups.
+#[test]
+fn package_json_pin_replaces_path_bindings_and_pin_file() {
+    let project = Project::new();
+    let path = ".claude/settings.json";
+    project.write(".dinyd-version", "0.5.0\n");
+    project.write(
+        path,
+        &json!({"hooks":{"PreToolUse":[{"matcher":"Edit|Write|MultiEdit", "hooks":[{"type":"command", "command":"dinyd guard --host claude-code"}]}]}})
+            .to_string(),
+    );
+    project.write(
+        "package.json",
+        &json!({"devDependencies":{"@undervoke/dinyd": env!("CARGO_PKG_VERSION")}}).to_string(),
+    );
+    project.write("pnpm-lock.yaml", "lockfileVersion: '9.0'\n");
+    let output = project.init("claude-code,pi");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(!project.path().join(".dinyd-version").exists());
+    let settings: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(project.path().join(path)).unwrap()).unwrap();
+    assert_eq!(
+        settings,
+        json!({"hooks":{"PreToolUse":[{"matcher":"Edit|Write|MultiEdit", "hooks":[{"type":"command", "command":"pnpm exec dinyd guard --host claude-code"}]}]}})
+    );
+    let plugin =
+        std::fs::read_to_string(project.path().join(".pi/extensions/dinyd-guard.ts")).unwrap();
+    assert!(plugin.contains(r#"const DINYD = ["pnpm","exec","dinyd"];"#));
+}

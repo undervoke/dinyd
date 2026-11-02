@@ -2,6 +2,7 @@
 
 One native executable keeps runtime selection and commands on the same release lifecycle.
 The Git root's `.dinyd-version` pins the project's behavior across clones and worktrees.
+A Git root `package.json` depending on the npm package pins it instead, so a JavaScript project's dependency install supplies the runtime without a PATH installation; init removes `.dinyd-version` there so dispatch cannot divert from the package manager's version.
 `update` changes the invoked installation; an explicit `init --version` changes the project pin and its matching host settings.
 A cached runtime keeps its version identity, so it is not a self-update destination.
 Cache identity includes the platform as well as the version, because native and Rosetta installations can coexist in one account.
@@ -13,7 +14,7 @@ Runtime acquisition and settings validation precede project writes, so installed
 Init asks which [agent hosts](lock.md#host-boundary)<!-- dinyd: #supported-hosts d1:ea68c870627ba8be --> to configure, defaulting to existing DinyD registrations rather than inferring consent from other agent settings.
 Unattended setup preserves that selection; a first unattended setup records only the pin.
 Installed DinyD registrations are the host record, and init replaces or removes only the settings it owns.
-Settings become active in a host that can resolve `dinyd` on PATH and has completed its required restart and trust steps.
+Settings become active in a host that can resolve `dinyd` on PATH, or the package manager under a `package.json` pin, and has completed its required restart and trust steps.
 The consuming project owns Git-hook and CI wiring.
 
 Guard runtime selection follows the session's worktree: a host may run its hook in the main checkout while the agent edits another worktree. <!-- dinyd: templates/opencode-dinyd-guard.ts#sessionWorktree s1:61460c7fa205bd00 -->
