@@ -13,8 +13,8 @@ on:
 jobs:
   publish:
     runs-on: "ubuntu-22.04"
+    # A called job cannot exceed the caller's grant, which carries no contents scope.
     permissions:
-      contents: read
       id-token: write
     env:
       PLAN: ${{ inputs.plan }}
