@@ -45,7 +45,7 @@ and a `.sha256` checksum for manual installation:
 | Windows x64 | `dinyd-x86_64-pc-windows-msvc.zip` |
 
 ```sh
-v=v0.7.0 t=x86_64-unknown-linux-musl
+v=v0.7.1 t=x86_64-unknown-linux-musl
 curl -fsSLO "https://github.com/undervoke/dinyd/releases/download/$v/dinyd-$t.tar.xz"
 curl -fsSLO "https://github.com/undervoke/dinyd/releases/download/$v/dinyd-$t.tar.xz.sha256"
 shasum -a 256 -c "dinyd-$t.tar.xz.sha256"
@@ -53,7 +53,7 @@ tar -xJf "dinyd-$t.tar.xz"   # binary at dinyd-$t/dinyd
 ```
 
 With <!-- dinyd-id: minimum-rust -->Rust 1.93.0<!-- /dinyd-id: minimum-rust --> or later and a C build toolchain,
-`cargo install --locked --git https://github.com/undervoke/dinyd --tag v0.7.0`
+`cargo install --locked --git https://github.com/undervoke/dinyd --tag v0.7.1`
 builds the same version from source. The prebuilt archives need neither.
 
 The generated bootstrap installers do not guarantee checksum verification
@@ -94,7 +94,7 @@ dependency install. Change the version with the package manager.
 dinyd init --hosts claude-code,codex,cursor
 dinyd init --hosts none
 dinyd init --version latest
-dinyd init --version 0.7.0
+dinyd init --version 0.7.1
 dinyd update
 ```
 
