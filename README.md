@@ -66,10 +66,10 @@ A JavaScript project can instead pin the release as a dev dependency:
 pnpm add -D --save-exact @undervoke/dinyd
 ```
 
-The package's install script downloads the platform archive from GitHub
-Releases without verifying its checksum, so installation needs network
-access. pnpm 10 runs that script only for a package listed in
-`onlyBuiltDependencies` or `allowBuilds`. Run it with `pnpm exec dinyd`.
+Each platform's binary ships in its own optional dependency,
+`@undervoke/dinyd-<os>-<cpu>`, so the lockfile's integrity hash covers the
+executable and installation runs no script. An install that omits optional
+dependencies has no binary. Run it with `pnpm exec dinyd`.
 
 ### Project setup and versions
 

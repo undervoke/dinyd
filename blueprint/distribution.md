@@ -4,6 +4,7 @@
 `rust-version` in [Cargo.toml](../Cargo.toml), the channel in [rust-toolchain.toml](../rust-toolchain.toml)<!-- dinyd: b1:92b454c1ccf330de -->, and the minimum Rust in the [README](../README.md#install)<!-- dinyd: #minimum-rust d1:44f7526b6628a969 --> name one version; change them together.
 Native archives and bootstrap installers support [project setup](installation.md) without a consumer build toolchain.
 The manual archive-and-checksum path remains available because stock bootstrap installers do not guarantee checksum verification on every platform.
+npm packages carry each platform's release binary ([packing](../npm/pack.mjs)), so the consumer's lockfile integrity covers the executable and no install script runs.
 Version-cache downloads and self-update share native acquisition with full SHA-256 verification against the release sidecar.
 A cache executable becomes visible only when complete, because several hooks can start concurrently.
 Executable replacement must support Windows, where the running executable remains in use.

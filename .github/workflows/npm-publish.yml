@@ -1,6 +1,7 @@
 # Called by release.yml as dist's custom publish job (publish-jobs = ["./npm-publish"]).
 # Publishes through npm Trusted Publishing (OIDC); npm matches the trusted
-# publisher against the caller workflow, release.yml.
+# publisher against the caller workflow, release.yml. Each new package name
+# needs a manual first publish before a trusted publisher can be attached.
 name: npm-publish
 
 on:
@@ -19,19 +20,27 @@ jobs:
     env:
       PLAN: ${{ inputs.plan }}
     steps:
-      - name: Fetch npm packages
+      # checkout needs a contents scope this job cannot hold; the repository is public.
+      - name: Fetch the packaging script
+        run: |
+          git init -q src
+          git -C src fetch -q --depth 1 "https://github.com/${GITHUB_REPOSITORY}" "$GITHUB_SHA"
+          git -C src checkout -q FETCH_HEAD
+      - name: Fetch release archives
         uses: actions/download-artifact@v8
         with:
           pattern: artifacts-*
-          path: npm/
+          path: archives/
           merge-multiple: true
       # Trusted Publishing needs npm 11.5.1 or later.
       - uses: actions/setup-node@v6
         with:
           node-version: '24.x'
           registry-url: 'https://registry.npmjs.org'
+      # Platform packages go first so the main package never resolves to a missing binary.
       - run: |
-          for release in $(echo "$PLAN" | jq --compact-output '.releases[] | select([.artifacts[] | endswith("-npm-package.tar.gz")] | any)'); do
-            pkg=$(echo "$release" | jq '.artifacts[] | select(endswith("-npm-package.tar.gz"))' --raw-output)
-            npm publish --access public "./npm/${pkg}"
+          version=$(echo "$PLAN" | jq --raw-output '.releases[] | select(.app_name == "dinyd") | .app_version')
+          node src/npm/pack.mjs "$version" archives npm
+          for pkg in npm/dinyd-*/ npm/dinyd/; do
+            npm publish --access public "./${pkg}"
           done

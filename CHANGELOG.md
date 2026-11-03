@@ -4,6 +4,20 @@ User-facing changes and upgrade notes for DinyD.
 
 For a project with `.dinyd-version`, `dinyd init --version <version>` selects the release and regenerates its selected host bindings. `dinyd update` upgrades the installed executable while preserving the project pin.
 
+## Unreleased
+
+### Changed
+
+- The npm package no longer downloads the binary in an install script. Each platform's binary ships in an optional dependency (`@undervoke/dinyd-<os>-<cpu>`), so the lockfile's integrity hash covers it.
+
+### Fixed
+
+- The npm launcher exits nonzero when the native process is killed by a signal; it previously reported success.
+
+### Upgrade notes
+
+- Remove `@undervoke/dinyd` from pnpm's `onlyBuiltDependencies` or `allowBuilds`; the package has no install script.
+
 ## 0.7.0
 
 ### Added

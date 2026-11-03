@@ -8,10 +8,9 @@ cargo-dist-version = "0.32.0"
 # CI backends to support
 ci = "github"
 # The installers to generate for each app
-installers = ["shell", "powershell", "npm"]
-# Scope of the npm package (@undervoke/dinyd)
-npm-scope = "@undervoke"
-# Custom job: npm Trusted Publishing (OIDC) instead of the stock NPM_TOKEN job
+installers = ["shell", "powershell"]
+# Custom job: npm packages that carry the binaries (npm/pack.mjs), published
+# through Trusted Publishing (OIDC)
 publish-jobs = ["./npm-publish"]
 install-path = ["$LOCALAPPDATA/Programs/dinyd/bin", "~/.local/bin"]
 # Target platforms to build apps for (Rust target-triple syntax)
